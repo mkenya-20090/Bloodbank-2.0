@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — HemoLink{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+{# ── ALERTS ── #}
+{% if alerts %}
+<div class="alerts-container">
+{% for a in alerts %}
+<div class="al {% if a.level=='critical' %}al-r{% else %}al-a{% endif %} alert-item">
+  <i class="fas fa-{% if a.level=='critical' %}circle-exclamation{% elif a.level=='expiring' %}clock{% else %}triangle-exclamation{% endif %}"></i>
+  <span>{% if a.level=='critical' %}<strong>Critical:</strong> {{ a.blood_type }} — {{ a.units }} unit(s) left
+  {% elif a.level=='expiring' %}<strong>Expiring:</strong> {{ a.blood_type }} in {{ a.days }} day(s)
+  {% else %}<strong>Low:</strong> {{ a.blood_type }} — {{ a.units }} unit(s) remaining{% endif %}</span>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+{# ── STAT CARDS ── #}
+<div class="sg dashboard-grid">
+  <div class="sc-card">
+    <div class="sc-ic ic-r"><i class="fas fa-users"></i></div>
+    <div>
+      <div class="sc-lbl">Total Donors</div>
+      <div class="sc-val">{{ total_donors }}</div>
+      <div class="sc-sub">{{ facility.name[:22] if facility else '' }}</div>
+    </div>
+  </div>
+  <div class="sc-card">
+    <div class="sc-ic ic-g"><i class="fas fa-droplet"></i></div>
+    <div>
+      <div class="sc-lbl">Blood Units</div>
+      <div class="sc-val">{{ total_units }}</div>
+      <div class="sc-sub">Across {{ inventory|length }} blood types</div>
+    </div>
+  </div>
+  <div class="sc-card">
+    <div class="sc-ic ic-a"><i class="fas fa-calendar"></i></div>
+    <div>
+      <div class="sc-lbl">Pending Appts</div>
+      <div class="sc-val">{{ pending_appointments }}</div>
+      <div class="sc-sub">Awaiting your review</div>
+    </div>
+  </div>
+  <div class="sc-card">
+    <div class="sc-ic ic-b"><i class="fas fa-user-clock"></i></div>
+    <div>
+      <div class="sc-lbl">Member Approvals</div>
+      <div class="sc-val">{{ pending_approvals }}</div>
+      <div class="sc-sub">Pending registrations</div>
+    </div>
+  </div>
+  <div class="sc-card">
+    <div class="sc-ic ic-r"><i class="fas fa-hand-holding-medical"></i></div>
+    <div>
+      <div class="sc-lbl">Blood Requests</div>
+      <div class="sc-val">{{ blood_requests|length }}</div>
+      <div class="sc-sub">Open requests today</div>
+    </div>
+  </div>
+  <div class="sc-card">
+    <div class="sc-ic ic-g"><i class="fas fa-user-group"></i></div>
+    <div>
+      <div class="sc-lbl">Total Recipients</div>
+      <div class="sc-val">{{ total_recipients }}</div>
+      <div class="sc-sub">Registered at facility</div>
+    </div>
+  </div>
+</div>
+
+{# ── ROW 1: Inventory + Donations chart ── #}
+<div class="g2 mb3">
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-tt">Blood Inventory</div>
+      <a href="{{ url_for('admin_inventory') }}" class="btn btn-secondary btn-sm">Manage →</a>
+    </div>
+    <div class="blood-type-bar" id="invBars"></div>
+  </div>
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-tt">Monthly Donations</div>
+      <span class="meta-note">Last 6 months</span>
+    </div>
+    <div class="chart-box"><canvas id="donChart"></canvas></div>
+  </div>
+</div>
+
+{# ── ROW 2: Pending Members + Blood Requests ── #}
+<div class="g2 mb3">
+  {# Pending approvals #}
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-tt">Pending Approvals</div>
+      <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-sm">All Members →</a>
+    </div>
+    {% if pending_users %}
+    <div class="tw">
+      <table>
+        <thead><tr><th>Member</th><th>Role</th><th>Blood</th><th></th></tr></thead>
+        <tbody>
+        {% for u in pending_users[:6] %}
+        <tr>
+          <td>
+            <div class="member-item-row">
+                <div class="av">{{ u.first_name[0] }}{{ u.last_name[0] }}</div>
+                <div>
+                <div style="font-weight:500;font-size:13px">{{ u.first_name }} {{ u.last_name }}</div>
+                <div style="font-size:11px;color:var(--mu)">{{ u.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge {% if u.role=='admin' %}badge-blue{% elif u.role=='donor' %}badge-red{% else %}badge-green{% endif %}">{{ u.role }}</span></td>
+          <td>{% if u.blood_type %}<span class="bb">{{ u.blood_type }}</span>{% else %}<span style="color:var(--mu)">—</span>{% endif %}</td>
+          <td>
+            <div style="display:flex;gap:5px">
+              <button class="btn btn-success btn-sm btn-icon" onclick="approveUser({{ u.id }})" title="Approve"><i class="fas fa-check"></i></button>
+              <button class="btn btn-ghost btn-sm btn-icon" onclick="viewUser({{ u.id }})" title="View"><i class="fas fa-eye"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="rejectUser({{ u.id }})" title="Reject"><i class="fas fa-times"></i></button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="es"><i class="fas fa-check-circle" style="color:#16a34a"></i><p>No pending approvals</p></div>
+    {% endif %}
+  </div>
+
+  {# Blood requests #}
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-tt">Blood Requests</div>
+      <a href="{{ url_for('admin_blood_requests') }}" class="btn btn-secondary btn-sm">All Requests →</a>
+    </div>
+    {% if blood_requests %}
+    <div class="tw">
+      <table>
+        <thead><tr><th>Patient</th><th>Type</th><th>Units</th><th>Urgency</th><th></th></tr></thead>
+        <tbody>
+        {% for r in blood_requests[:6] %}
+        <tr>
+          <td style="font-weight:500;font-size:13px">{{ r.requester.first_name }} {{ r.requester.last_name }}</td>
+          <td><span class="bb">{{ r.blood_type }}</span></td>
+          <td style="font-weight:600">{{ r.units_needed }}</td>
+          <td><span class="badge {% if r.urgency=='critical' %}badge-red{% elif r.urgency=='urgent' %}badge-gold{% else %}badge-gray{% endif %}">{{ r.urgency }}</span></td>
+          <td><button class="btn btn-success btn-sm" onclick="fulfillRequest({{ r.id }})"><i class="fas fa-check"></i> Fulfill</button></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="es"><i class="fas fa-check-circle" style="color:#16a34a"></i><p>No pending requests</p></div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Recent Appointments ── #}
+<div class="card">
+  <div class="card-hd">
+    <div class="card-tt">Recent Appointments</div>
+    <a href="{{ url_for('admin_appointments') }}" class="btn btn-primary btn-sm">Manage All →</a>
+  </div>
+  {% if recent_appointments %}
+  <div class="tw">
+    <table>
+      <thead><tr><th>Patient</th><th>Type</th><th>Date</th><th>Blood Type</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for a in recent_appointments %}
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="av" style="width:28px;height:28px;font-size:10px">{{ a.user.first_name[0] }}{{ a.user.last_name[0] }}</div>
+            <div>
+              <div style="font-weight:500;font-size:13px">{{ a.user.first_name }} {{ a.user.last_name }}</div>
+              <div style="font-size:11px;color:var(--mu)">{{ a.user.phone or '' }}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge {% if a.type=='donation' %}badge-red{% else %}badge-blue{% endif %}">{{ a.type }}</span></td>
+        <td>
+          <div style="font-size:13px;font-weight:500">{{ a.appointment_date.strftime('%d %b %Y') }}</div>
+          <div style="font-size:11px;color:var(--mu)">{{ a.appointment_time or 'Any time' }}</div>
+        </td>
+        <td>
+          {% if a.blood_type_needed %}<span class="bb">{{ a.blood_type_needed }}</span>
+          {% elif a.user.blood_type %}<span class="bb">{{ a.user.blood_type }}</span>
+          {% else %}<span style="color:var(--mu)">—</span>{% endif %}
+        </td>
+        <td><span class="badge {% if a.status=='approved' %}badge-green{% elif a.status=='pending' %}badge-gold{% elif a.status=='rejected' %}badge-red{% else %}badge-gray{% endif %}">{{ a.status }}</span></td>
+        <td>
+          {% if a.status=='pending' %}
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-success btn-sm btn-icon" onclick="approveAppt({{ a.id }})" title="Approve"><i class="fas fa-check"></i></button>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="openReject({{ a.id }})" title="Reject"><i class="fas fa-times"></i></button>
+          </div>
+          {% elif a.status=='approved' %}
+          <button class="btn btn-primary btn-sm" onclick="completeAppt({{ a.id }})"><i class="fas fa-check-double"></i> Complete</button>
+          {% else %}<span style="font-size:11px;color:var(--mu)">{{ a.admin_notes[:30] if a.admin_notes else '—' }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="es"><i class="fas fa-calendar"></i><p>No appointments yet.</p></div>
+  {% endif %}
+</div>
+
+{# ── Modals ── #}
+<div class="modal-overlay" id="userModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">Member Profile</div>
+      <button class="modal-close" onclick="closeModal('userModal')">×</button>
+    </div>
+    <div class="modal-body" id="userBody">Loading…</div>
+    <div class="modal-footer" id="userActions"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rejectModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Reject Appointment</div>
+      <button class="modal-close" onclick="closeModal('rejectModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rejId">
+      <div class="form-group">
+        <label class="form-label">Reason (shown to patient)</label>
+        <textarea id="rejNotes" class="form-control" rows="3" placeholder="Explain why this appointment is being rejected…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('rejectModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmReject()"><i class="fas fa-times"></i> Reject</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const IL = {{ inv_labels|safe }}, ID = {{ inv_data|safe }};
+const MO = {{ months|safe }}, MC = {{ month_counts|safe }};
+const dark = document.documentElement.className === 'dark';
+const gridC = dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.04)';
+const tickC = dark ? '#555' : '#999';
+
+// Inventory bars
+const bEl = document.getElementById('invBars');
+const mx = Math.max(...ID, 20);
+IL.forEach((bt,i) => {
+  const u = ID[i], pct = Math.min(100,(u/mx)*100);
+  const cls = u < 5 ? 'low' : u < 10 ? 'medium' : 'good';
+  bEl.innerHTML += `<div class="bt-row">
+    <div class="bt-label">${bt}</div>
+    <div class="bt-bar-wrap"><div class="bt-bar ${cls}" style="width:${pct}%"></div></div>
+    <div class="bt-count">${u}</div>
+  </div>`;
+});
+
+// Chart
+new Chart(document.getElementById('donChart').getContext('2d'), {
+  type:'line',
+  data:{labels:MO,datasets:[{data:MC,borderColor:'#c0102a',backgroundColor:'rgba(192,16,42,.08)',
+    borderWidth:2,pointBackgroundColor:'#c0102a',pointRadius:3,tension:.4,fill:true}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{title:t=>t[0].label,label:c=>`${c.raw} donation${c.raw!==1?'s':''}`}}},
+    scales:{
+      y:{beginAtZero:true,grid:{color:gridC},ticks:{font:{size:11},color:tickC,stepSize:1}},
+      x:{grid:{display:false},ticks:{font:{size:11},color:tickC}}
+    }}
+});
+
+async function approveUser(uid){
+  const r = await fetch(`/admin/users/approve/${uid}`,{method:'POST',body:new FormData()});
+  const d = await r.json();
+  if(d.success){showToast(d.message,'success');setTimeout(()=>location.reload(),900);}
+  else showToast(d.message,'error');
+}
+async function rejectUser(uid){
+  if(!confirm('Reject this registration?'))return;
+  const r = await fetch(`/admin/users/reject/${uid}`,{method:'POST',body:new FormData()});
+  const d = await r.json();
+  if(d.success){showToast(d.message,'warning');setTimeout(()=>location.reload(),900);}
+}
+async function viewUser(uid){
+  const r = await fetch(`/admin/users/${uid}`);
+  const d = await r.json();
+  document.getElementById('userBody').innerHTML=`
+    <div class="g2 mb2">
+      <div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div class="av" style="width:44px;height:44px;font-size:16px">${d.name.split(' ').map(n=>n[0]).join('')}</div>
+          <div>
+            <div style="font-size:16px;font-weight:500">${d.name}</div>
+            <div style="display:flex;gap:5px;margin-top:3px"><span class="badge badge-red">${d.role}</span>${d.blood_type?`<span class="bb" style="width:24px;height:24px;font-size:10px">${d.blood_type}</span>`:''}</div>
+          </div>
+        </div>
+        <div style="font-size:12.5px;display:flex;flex-direction:column;gap:6px;font-family:'Inter',sans-serif">
+          <div><i class="fas fa-envelope" style="width:15px;color:var(--mu)"></i> ${d.email}</div>
+          <div><i class="fas fa-phone" style="width:15px;color:var(--mu)"></i> ${d.phone||'—'}</div>
+          <div><i class="fas fa-id-card" style="width:15px;color:var(--mu)"></i> ${d.national_id||'—'}</div>
+          <div><i class="fas fa-location-dot" style="width:15px;color:var(--mu)"></i> ${d.county||'—'}</div>
+          <div><i class="fas fa-cake-candles" style="width:15px;color:var(--mu)"></i> ${d.dob||'—'}</div>
+          <div><i class="fas fa-weight-scale" style="width:15px;color:var(--mu)"></i> ${d.weight_kg||'—'} kg</div>
+          <div><i class="fas fa-heart" style="width:15px;color:var(--mu)"></i> ${d.donations_count} donations · Last: ${d.last_donation_date||'Never'}</div>
+        </div>
+      </div>
+      <div style="background:rgba(192,16,42,.04);border-radius:7px;padding:14px;border:1px solid rgba(192,16,42,.12)">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--red);font-weight:700;margin-bottom:10px;font-family:'Inter',sans-serif">Medical Summary</div>
+        <div style="font-size:12px;display:flex;flex-direction:column;gap:5px;font-family:'Inter',sans-serif">
+          <div>HIV: <strong style="color:${d.hiv_status==='positive'?'#dc2626':'#16a34a'}">${d.hiv_status}</strong></div>
+          <div>Hepatitis B: <strong>${d.hepatitis_b?'<span style="color:#dc2626">Yes</span>':'No'}</strong></div>
+          <div>Hepatitis C: <strong>${d.hepatitis_c?'<span style="color:#dc2626">Yes</span>':'No'}</strong></div>
+          <div>Malaria history: <strong>${d.malaria_history?'Yes':'No'}</strong></div>
+          <div>Chronic disease: <strong>${d.has_chronic_disease?`<span style="color:#d97706">${d.chronic_disease_details||'Yes'}</span>`:'None'}</strong></div>
+          <div>Medication: <strong>${d.on_medication?`<span style="color:#d97706">${d.medication_details||'Yes'}</span>`:'No'}</strong></div>
+          <div>Surgeries: <strong>${d.recent_surgery?'Recent':'None'}</strong></div>
+          <div>Allergies: <strong>${d.allergies||'None'}</strong></div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--bg);border-radius:6px;padding:11px 13px;font-size:12.5px;font-family:'Inter',sans-serif;display:flex;gap:14px;flex-wrap:wrap">
+      <span><strong>Emergency:</strong> ${d.emergency_contact_name||'—'} · ${d.emergency_contact_phone||'—'}</span>
+      <span class="badge ${d.is_approved?'badge-green':'badge-gold'}">${d.is_approved?'Approved':'Pending'}</span>
+      <span class="badge ${d.is_active?'badge-green':'badge-red'}">${d.is_active?'Active':'Suspended'}</span>
+    </div>`;
+  document.getElementById('userActions').innerHTML = !d.is_approved
+    ? `<button class="btn btn-ghost" onclick="closeModal('userModal')">Close</button>
+       <button class="btn btn-success" onclick="approveUser(${d.id});closeModal('userModal')"><i class="fas fa-check"></i> Approve</button>
+       <button class="btn btn-danger" onclick="rejectUser(${d.id});closeModal('userModal')"><i class="fas fa-times"></i> Reject</button>`
+    : `<button class="btn btn-secondary" onclick="closeModal('userModal')">Close</button>`;
+  openModal('userModal');
+}
+async function approveAppt(id){
+  const fd=new FormData();fd.append('notes','');
+  const r=await fetch(`/admin/appointments/${id}/approve`,{method:'POST',body:fd});
+  const d=await r.json();
+  if(d.success){showToast(d.message,'success');setTimeout(()=>location.reload(),900);}
+}
+async function completeAppt(id){
+  if(!confirm('Mark as completed? This records the donation and updates inventory.'))return;
+  const r=await fetch(`/admin/appointments/${id}/complete`,{method:'POST',body:new FormData()});
+  const d=await r.json();
+  if(d.success){showToast(d.message,'success');setTimeout(()=>location.reload(),1100);}
+}
+function openReject(id){document.getElementById('rejId').value=id;openModal('rejectModal');}
+async function confirmReject(){
+  const id=document.getElementById('rejId').value;
+  const notes=document.getElementById('rejNotes').value;
+  const fd=new FormData();fd.append('notes',notes);
+  const r=await fetch(`/admin/appointments/${id}/reject`,{method:'POST',body:fd});
+  const d=await r.json();
+  if(d.success){showToast(d.message,'warning');closeModal('rejectModal');setTimeout(()=>location.reload(),900);}
+}
+async function fulfillRequest(id){
+  const fd=new FormData();fd.append('units',1);
+  const r=await fetch(`/admin/blood-requests/${id}/fulfill`,{method:'POST',body:fd});
+  const d=await r.json();
+  if(d.success){showToast(d.message,'success');setTimeout(()=>location.reload(),900);}
+  else showToast(d.message,'error');
+}
+</script>
+{% endblock %}

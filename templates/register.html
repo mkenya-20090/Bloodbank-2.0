@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HemoLink — Create Account</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root,[data-theme="light"]{
+  --red:#C8102E;--text:#111;--muted:#6b7280;
+  --border:#e5e7eb;--bg:#f9fafb;--surface:#fff;
+  --input-bg:#fff;--input-border:#d1d5db;
+}
+[data-theme="dark"]{
+  --text:#e8e8e8;--muted:#666;--border:#2e2e2e;
+  --bg:#141414;--surface:#1e1e1e;--input-bg:#252525;--input-border:#333;
+}
+body{font-family:'EB Garamond',Georgia,serif;background:var(--bg);color:var(--t);min-height:100vh;padding:32px 16px 60px}
+.wrap{max-width:560px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.brand-dot{width:22px;height:22px;background:var(--red);border-radius:5px;flex-shrink:0}
+.brand-name{font-size:15px;font-weight:600}
+h1{font-size:22px;font-weight:500;margin-bottom:4px;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--mu);margin-bottom:28px}
+.card{background:var(--sur);border:1px solid var(--b);border-radius:10px;padding:28px;margin-bottom:14px}
+.section-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--b)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{margin-bottom:12px}
+.field.full{grid-column:1/-1}
+label{display:block;font-size:12px;font-weight:500;color:var(--mu);margin-bottom:4px;font-family:'Inter',sans-serif}
+label span{color:var(--red)}
+input,select,textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:6px;
+  font-family:'Inter',sans-serif;font-size:13.5px;color:var(--t);
+  background:var(--input-bg);outline:none;transition:border-color .15s
+}
+input:focus,select:focus,textarea:focus{border-color:var(--red)}
+textarea{resize:vertical;min-height:56px}
+select option{background:var(--sur);color:var(--t)}
+.radio-row{display:flex;gap:8px;flex-wrap:wrap}
+.rpill input{display:none}
+.rpill label{padding:6px 14px;border:1px solid var(--b);border-radius:20px;font-size:12.5px;cursor:pointer;color:var(--mu);display:block;font-family:'Inter',sans-serif;font-weight:400}
+.rpill input:checked+label{background:var(--red);border-color:var(--red);color:#fff;font-weight:500}
+.notice{padding:10px 13px;background:rgba(200,16,46,.06);border:1px solid rgba(200,16,46,.18);border-radius:6px;font-size:12.5px;color:var(--red);margin-bottom:12px;font-family:'Inter',sans-serif;display:none}
+.consent-row{display:flex;align-items:flex-start;gap:9px;margin-top:4px}
+.consent-row input[type=checkbox]{width:auto;margin-top:3px;accent-color:var(--red);flex-shrink:0}
+.consent-row span{font-size:12.5px;color:var(--mu);font-family:'Inter',sans-serif;line-height:1.5}
+.btn{width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:7px;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-top:4px}
+.btn:hover{opacity:.88}.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn-submit{margin-top:16px}
+.msg{padding:10px 13px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none;font-family:'Inter',sans-serif}
+.msg.error{background:rgba(200,16,46,.07);border:1px solid rgba(200,16,46,.2);color:var(--red)}
+.msg.success{background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.2);color:#16a34a}
+.signin-link{text-align:center;font-size:13px;color:var(--mu);margin-top:12px;font-family:'Inter',sans-serif}
+.signin-link a{color:var(--red);font-weight:500;text-decoration:underline}
+footer{text-align:center;font-size:11.5px;color:var(--mu);margin-top:20px;font-family:'Inter',sans-serif}
+footer strong{color:var(--red);font-weight:600}
+#themeBtn{position:fixed;top:14px;right:14px;width:32px;height:32px;border-radius:6px;background:var(--sur);border:1px solid var(--b);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:13px;z-index:100}
+@media(max-width:500px){.grid{grid-template-columns:1fr}}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <span class="brand-name">HemoLink Kenya</span>
+  </div>
+  <h1>Create account</h1>
+  <p class="sub">Join your facility's blood bank network</p>
+
+  <div id="msg" class="msg"></div>
+
+  <form id="regForm" onsubmit="handleSubmit(event)" novalidate>
+
+    <!-- Account -->
+    <div class="card">
+      <div class="section-head">Account</div>
+      <div class="grid">
+        <div class="field full">
+          <label>I am a <span>*</span></label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="role" value="donor" id="r_donor" required><label for="r_donor">Donor</label></div>
+            <div class="rpill"><input type="radio" name="role" value="recipient" id="r_recipient"><label for="r_recipient">Recipient</label></div>
+          </div>
+        </div>
+        <div class="field full">
+          <label for="facility_id">Facility <span>*</span></label>
+          <select id="facility_id" name="facility_id" required>
+            <option value="">Select a facility…</option>
+            {% for f in facilities %}<option value="{{ f.id }}">{{ f.name }} ({{ f.county }})</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Email <span>*</span></label>
+          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Phone</label>
+          <input type="tel" name="phone" placeholder="+254 7XX XXX XXX">
+        </div>
+        <div class="field">
+          <label>Password <span>*</span></label>
+          <input type="password" name="password" id="pw" placeholder="Min 6 characters" required minlength="6">
+        </div>
+        <div class="field">
+          <label>Confirm password <span>*</span></label>
+          <input type="password" name="confirm_password" id="pw2" placeholder="Repeat password" required>
+        </div>
+      </div>
+    </div>
+
+    <!-- Personal -->
+    <div class="card">
+      <div class="section-head">Personal Details</div>
+      <div class="grid">
+        <div class="field">
+          <label>First name <span>*</span></label>
+          <input type="text" name="first_name" placeholder="e.g. James" required autocomplete="given-name">
+        </div>
+        <div class="field">
+          <label>Last name <span>*</span></label>
+          <input type="text" name="last_name" placeholder="e.g. Mwangi" required autocomplete="family-name">
+        </div>
+        <div class="field">
+          <label>National ID <span>*</span></label>
+          <input type="text" name="national_id" placeholder="e.g. 12345678" required>
+        </div>
+        <div class="field">
+          <label>Date of birth <span>*</span></label>
+          <input type="date" name="date_of_birth" title="Date of birth" required>
+        </div>
+        <div class="field">
+          <label>Gender</label>
+          <select name="gender" title="Gender">
+            <option value="">Select…</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Blood type</label>
+          <select name="blood_type" title="Blood type">
+            <option value="">Unknown</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+            <option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Weight (kg)</label>
+          <input type="number" name="weight_kg" placeholder="e.g. 70" min="40" max="200">
+        </div>
+        <div class="field">
+          <label>County</label>
+          <input type="text" name="county" placeholder="e.g. Nairobi">
+        </div>
+        <div class="field">
+          <label>Emergency contact name</label>
+          <input type="text" name="emergency_contact_name" placeholder="Full name">
+        </div>
+        <div class="field">
+          <label>Emergency contact phone</label>
+          <input type="tel" name="emergency_contact_phone" placeholder="+254 7XX XXX XXX">
+        </div>
+      </div>
+    </div>
+
+    <!-- Medical -->
+    <div class="card">
+      <div class="section-head">Medical History</div>
+      <div class="grid">
+        <div class="field full">
+          <label>Have you donated blood before?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="has_donated_before" value="yes" id="hdb_y"><label for="hdb_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="has_donated_before" value="no" id="hdb_n" checked><label for="hdb_n">No</label></div>
+          </div>
+        </div>
+        <div class="field full hidden" id="lastDonField">
+          <label>Date of last donation</label>
+          <input type="date" name="last_donation_date">
+        </div>
+        <div class="field">
+          <label>Chronic disease?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="has_chronic_disease" value="yes" id="hcd_y"><label for="hcd_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="has_chronic_disease" value="no" id="hcd_n" checked><label for="hcd_n">No</label></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>On medication?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="on_medication" value="yes" id="om_y"><label for="om_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="on_medication" value="no" id="om_n" checked><label for="om_n">No</label></div>
+          </div>
+        </div>
+        <div class="field full hidden" id="chronicField">
+          <label>Describe condition(s)</label>
+          <textarea name="chronic_disease_details" placeholder="e.g. Hypertension, Diabetes…"></textarea>
+        </div>
+        <div class="field full hidden" id="medField">
+          <label>List medications</label>
+          <textarea name="medication_details" placeholder="e.g. Metformin 500mg…"></textarea>
+        </div>
+        <div class="field">
+          <label>HIV status</label>
+          <select name="hiv_status" title="HIV status">
+            <option value="negative">Negative</option>
+            <option value="positive">Positive</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Hepatitis B?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="hepatitis_b" value="yes" id="hb_y"><label for="hb_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="hepatitis_b" value="no" id="hb_n" checked><label for="hb_n">No</label></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Hepatitis C?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="hepatitis_c" value="yes" id="hc_y"><label for="hc_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="hepatitis_c" value="no" id="hc_n" checked><label for="hc_n">No</label></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Recent malaria?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="malaria_history" value="yes" id="mh_y"><label for="mh_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="malaria_history" value="no" id="mh_n" checked><label for="mh_n">No</label></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Surgery (last 6 months)?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="recent_surgery" value="yes" id="rs_y"><label for="rs_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="recent_surgery" value="no" id="rs_n" checked><label for="rs_n">No</label></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tattoo / piercing (3 months)?</label>
+          <div class="radio-row">
+            <div class="rpill"><input type="radio" name="recent_tattoo" value="yes" id="rt_y"><label for="rt_y">Yes</label></div>
+            <div class="rpill"><input type="radio" name="recent_tattoo" value="no" id="rt_n" checked><label for="rt_n">No</label></div>
+          </div>
+        </div>
+        <div class="field full">
+          <label>Known allergies</label>
+          <input type="text" name="allergies" placeholder="e.g. Penicillin, latex…">
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="card">
+      <div class="consent-row">
+        <input type="checkbox" id="consent" title="Consent to terms">
+        <span>I confirm the above information is accurate and consent to its use for blood bank management purposes.</span>
+      </div>
+      <button type="submit" class="btn btn-submit" id="submitBtn">Create Account</button>
+    </div>
+  </form>
+
+  <p class="signin-link">Already have an account? <a href="/login">Sign in</a></p>
+  <footer><strong>mkenya</strong> — 20090 | 2026</footer>
+</div>
+
+<button onclick="toggleTheme()" id="themeBtn" title="Toggle theme"><i class="fas fa-moon" id="themeIcon"></i></button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<script>
+// Conditional fields
+document.querySelectorAll('[name=has_donated_before]').forEach(r=>r.addEventListener('change',e=>{
+  document.getElementById('lastDonField').style.display=e.target.value==='yes'?'block':'none';
+}));
+document.querySelectorAll('[name=has_chronic_disease]').forEach(r=>r.addEventListener('change',e=>{
+  document.getElementById('chronicField').style.display=e.target.value==='yes'?'block':'none';
+}));
+document.querySelectorAll('[name=on_medication]').forEach(r=>r.addEventListener('change',e=>{
+  document.getElementById('medField').style.display=e.target.value==='yes'?'block':'none';
+}));
+
+function showMsg(text, type){
+  const el = document.getElementById('msg');
+  el.className = 'msg ' + type;
+  el.textContent = text;
+  el.style.display = 'block';
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+async function handleSubmit(e){
+  e.preventDefault();
+  const form = e.target;
+  const btn = document.getElementById('submitBtn');
+  const msg = document.getElementById('msg');
+  msg.style.display = 'none';
+
+  // Validate role selected
+  const role = form.querySelector('[name=role]:checked');
+  if(!role){ showMsg('Please select your role (Donor or Recipient).', 'error'); return; }
+
+  // Validate required fields
+  const requiredFields = [
+    {name:'facility_id', label:'Facility'},
+    {name:'email', label:'Email'},
+    {name:'password', label:'Password'},
+    {name:'confirm_password', label:'Confirm password'},
+    {name:'first_name', label:'First name'},
+    {name:'last_name', label:'Last name'},
+    {name:'national_id', label:'National ID'},
+    {name:'date_of_birth', label:'Date of birth'},
+  ];
+  for(const {name, label} of requiredFields){
+    const el = form.querySelector(`[name="${name}"]`);
+    if(!el || !el.value.trim()){
+      el?.focus();
+      showMsg(`${label} is required.`, 'error');
+      return;
+    }
+  }
+
+  // Password match
+  if(form.querySelector('[name=password]').value !== form.querySelector('[name=confirm_password]').value){
+    showMsg('Passwords do not match.', 'error'); return;
+  }
+  // Password length
+  if(form.querySelector('[name=password]').value.length < 6){
+    showMsg('Password must be at least 6 characters.', 'error'); return;
+  }
+
+  // Consent
+  if(!document.getElementById('consent').checked){
+    showMsg('Please accept the consent statement.', 'error'); return;
+  }
+
+  btn.textContent = 'Creating account…';
+  btn.disabled = true;
+
+  const fd = new FormData(form);
+  try {
+    const r = await fetch('/register', {method:'POST', body: new URLSearchParams(fd)});
+    const data = await r.json();
+    if(data.success){
+      showMsg(data.message, 'success');
+      btn.textContent = 'Account created!';
+      setTimeout(()=>{ window.location.href = '/login'; }, 2000);
+    } else {
+      showMsg(data.message, 'error');
+      btn.textContent = 'Create Account';
+      btn.disabled = false;
+    }
+  } catch(err){
+    showMsg('Network error. Please try again.', 'error');
+    btn.textContent = 'Create Account';
+    btn.disabled = false;
+  }
+}
+
+// Theme
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('theme',t);
+  const i=document.getElementById('themeIcon');
+  if(i) i.className = t==='dark'?'fas fa-sun':'fas fa-moon';
+}
+function toggleTheme(){
+  const c=document.documentElement.getAttribute('data-theme')||'light';
+  applyTheme(c==='dark'?'light':'dark');
+}
+(function(){
+  const s=localStorage.getItem('theme');
+  if(s) applyTheme(s);
+  else if(window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme('dark');
+})();
+</script>
+</body>
+</html>

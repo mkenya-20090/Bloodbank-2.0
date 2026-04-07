@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}User Management{% endblock %}
+{% block page_title %}User Management{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="filter-btn active" data-filter="all">All ({{ users|length }})</button>
+      <button class="filter-btn" data-filter="admin">Admins</button>
+      <button class="filter-btn" data-filter="donor">Donors</button>
+      <button class="filter-btn" data-filter="recipient">Recipients</button>
+      <button class="filter-btn" data-filter="pending">Pending</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <input type="text" id="searchInput" class="form-control" style="width:220px;padding:8px 12px" placeholder="Search name, email...">
+  </div>
+</div>
+
+<div class="card">
+  {% if users %}
+  <div class="tw">
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Blood Type</th>
+          <th>County</th>
+          <th>Donations</th>
+          <th>Status</th>
+          <th>Registered</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in users %}
+      <tr class="urow" data-role="{{ u.role }}" data-approved="{{ u.is_approved|lower }}" data-name="{{ u.first_name }} {{ u.last_name }}" data-email="{{ u.email }}">
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="user-avatar" style="width:34px;height:34px;font-size:12px">{{ u.first_name[0] }}{{ u.last_name[0] }}</div>
+            <div>
+              <div style="font-weight:600;font-size:13px">{{ u.first_name }} {{ u.last_name }}</div>
+              <div style="font-size:11px;color:var(--mu)">{{ u.email }}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge {% if u.role=='admin' %}badge-blue{% elif u.role=='donor' %}badge-red{% else %}badge-green{% endif %}">{{ u.role }}</span></td>
+        <td>{% if u.blood_type %}<span class="blood-badge" style="width:28px;height:28px;font-size:10px">{{ u.blood_type }}</span>{% else %}—{% endif %}</td>
+        <td style="font-size:13px">{{ u.county or '—' }}</td>
+        <td style="font-weight:700;font-family:inherit">{{ u.donations|length }}</td>
+        <td>
+          {% if not u.is_approved %}
+          <span class="badge badge-gold"><i class="fas fa-clock"></i> Pending</span>
+          {% elif u.is_active %}
+          <span class="badge badge-green"><i class="fas fa-check"></i> Active</span>
+          {% else %}
+          <span class="badge badge-danger"><i class="fas fa-ban"></i> Suspended</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--mu)">{{ u.created_at.strftime('%d %b %Y') }}</td>
+        <td>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm btn-icon" onclick="viewUser({{ u.id }})" title="View details"><i class="fas fa-eye"></i></button>
+            {% if not u.is_approved %}
+            <button class="btn btn-success btn-sm btn-icon" onclick="approveUser({{ u.id }})" title="Approve"><i class="fas fa-check"></i></button>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="rejectUser({{ u.id }})" title="Reject"><i class="fas fa-times"></i></button>
+            {% else %}
+            <button class="btn {% if u.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm btn-icon" onclick="toggleUser({{ u.id }}, this)" title="{% if u.is_active %}Suspend{% else %}Activate{% endif %}">
+              <i class="fas fa-{% if u.is_active %}ban{% else %}check{% endif %}"></i>
+            </button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="es"><i class="fas fa-users"></i><p>No users registered at this facility yet.</p></div>
+  {% endif %}
+</div>
+
+<!-- USER DETAIL MODAL -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-user" style="color:var(--red);margin-right:8px"></i>User Details</div>
+      <button class="modal-close" onclick="closeModal('userModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="userModalBody"></div>
+    <div class="modal-footer" id="userModalActions"></div>
+  </div>
+</div>
+
+<script>
+// Filter
+var activeFilter = 'all';
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  document.querySelectorAll('.urow').forEach(row => {
+    const matchF = activeFilter === 'all'
+      || (activeFilter === 'donor' && row.dataset.role === 'donor')
+      || (activeFilter === 'recipient' && row.dataset.role === 'recipient')
+      || (activeFilter === 'admin' && row.dataset.role === 'admin')
+      || (activeFilter === 'pending' && row.dataset.approved === 'false');
+    const matchQ = !q || row.dataset.name.toLowerCase().includes(q) || row.dataset.email.toLowerCase().includes(q);
+    row.style.display = (matchF && matchQ) ? '' : 'none';
+  });
+}
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    applyFilters();
+  });
+});
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+
+async function viewUser(uid) {
+  const r = await fetch(`/admin/users/${uid}`);
+  const d = await r.json();
+  document.getElementById('userModalBody').innerHTML = `
+    <div class="grid-2 mb-2">
+      <div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+          <div class="user-avatar" style="width:52px;height:52px;font-size:18px">${d.name.split(' ').map(n=>n[0]).join('')}</div>
+          <div>
+            <div style="font-size:17px;font-weight:700">${d.name}</div>
+            <div><span class="badge badge-red">${d.role}</span> ${d.blood_type?`<span class="blood-badge" style="width:24px;height:24px;font-size:10px">${d.blood_type}</span>`:''}</div>
+          </div>
+        </div>
+        <div style="font-size:13px;display:flex;flex-direction:column;gap:7px">
+          <div><i class="fas fa-envelope" style="width:16px;color:var(--mu)"></i> ${d.email}</div>
+          <div><i class="fas fa-phone" style="width:16px;color:var(--mu)"></i> ${d.phone||'—'}</div>
+          <div><i class="fas fa-id-card" style="width:16px;color:var(--mu)"></i> ${d.national_id||'—'}</div>
+          <div><i class="fas fa-map-pin" style="width:16px;color:var(--mu)"></i> ${d.county||'—'}</div>
+          <div><i class="fas fa-venus-mars" style="width:16px;color:var(--mu)"></i> ${d.gender||'—'}</div>
+          <div><i class="fas fa-weight" style="width:16px;color:var(--mu)"></i> ${d.weight_kg||'—'} kg</div>
+          <div><i class="fas fa-birthday-cake" style="width:16px;color:var(--mu)"></i> ${d.dob||'—'}</div>
+          <div><i class="fas fa-tint" style="width:16px;color:var(--mu)"></i> Last donation: ${d.last_donation_date||'Never'}</div>
+          <div><i class="fas fa-heart" style="width:16px;color:var(--mu)"></i> Total donations: <strong>${d.donations_count}</strong></div>
+        </div>
+      </div>
+      <div style="background:rgba(200,16,46,0.04);border-radius:10px;padding:16px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--red);font-weight:700;margin-bottom:12px">Medical Summary</div>
+        <div style="font-size:12.5px;display:flex;flex-direction:column;gap:7px">
+          <div>HIV Status: <strong style="color:${d.hiv_status==='positive'?'#dc2626':'#16a34a'}">${d.hiv_status}</strong></div>
+          <div>Hepatitis B: <strong>${d.hepatitis_b?'<span style="color:#dc2626">Positive</span>':'Negative'}</strong></div>
+          <div>Hepatitis C: <strong>${d.hepatitis_c?'<span style="color:#dc2626">Positive</span>':'Negative'}</strong></div>
+          <div>Malaria history: <strong>${d.malaria_history?'Yes':'No'}</strong></div>
+          <div>Chronic disease: <strong>${d.has_chronic_disease?`<span style="color:#d97706">${d.chronic_disease_details||'Yes'}</span>`:'None'}</strong></div>
+          <div>On medication: <strong>${d.on_medication?`<span style="color:#d97706">${d.medication_details||'Yes'}</span>`:'No'}</strong></div>
+          <div>Recent surgery: <strong>${d.recent_surgery?'Yes':'No'}</strong></div>
+          <div>Recent tattoo: <strong>${d.recent_tattoo?'Yes':'No'}</strong></div>
+          <div>Allergies: <strong>${d.allergies||'None stated'}</strong></div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:14px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap">
+      <span><strong>Emergency:</strong> ${d.emergency_contact_name||'—'} · ${d.emergency_contact_phone||'—'}</span>
+      <span><span class="badge ${d.is_approved?'badge-green':'badge-gold'}">${d.is_approved?'Approved':'Pending'}</span></span>
+      <span><span class="badge ${d.is_active?'badge-green':'badge-danger'}">${d.is_active?'Active':'Suspended'}</span></span>
+    </div>`;
+  document.getElementById('userModalActions').innerHTML = !d.is_approved ? 
+    `<button class="btn btn-secondary" onclick="closeModal('userModal')">Close</button>
+     <button class="btn btn-success" onclick="approveUser(${d.id});closeModal('userModal')"><i class="fas fa-check"></i> Approve</button>
+     <button class="btn btn-danger" onclick="rejectUser(${d.id});closeModal('userModal')"><i class="fas fa-times"></i> Reject</button>` :
+    `<button class="btn btn-secondary" onclick="closeModal('userModal')">Close</button>`;
+  openModal('userModal');
+}
+
+async function approveUser(uid) {
+  const r = await fetch(`/admin/users/approve/${uid}`, {method:'POST', body:new FormData()});
+  const d = await r.json();
+  if(d.success){ showToast(d.message,'success'); setTimeout(()=>location.reload(),1000); }
+}
+async function rejectUser(uid) {
+  if(!confirm('Reject this user registration?')) return;
+  const r = await fetch(`/admin/users/reject/${uid}`, {method:'POST', body:new FormData()});
+  const d = await r.json();
+  if(d.success){ showToast(d.message,'warning'); setTimeout(()=>location.reload(),1000); }
+}
+async function toggleUser(uid, btn) {
+  const r = await fetch(`/admin/users/toggle/${uid}`, {method:'POST', body:new FormData()});
+  const d = await r.json();
+  if(d.success){ showToast(d.message, d.status?'success':'warning'); setTimeout(()=>location.reload(),1000); }
+}
+</script>
+{% endblock %}

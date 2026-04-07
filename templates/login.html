@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HemoLink Kenya — Blood Bank Management</title>
+<script>(function(){var t=localStorage.getItem('hl_theme')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.className=t;})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html.light{--red:#c0102a;--bg:#f3f3f3;--sur:#fff;--b:#e0e0e0;--t:#111;--t2:#555;--mu:#888;--in:#fff;--ib:#d0d0d0}
+html.dark{--red:#e0243a;--bg:#0f0f0f;--sur:#1c1c1c;--b:#2a2a2a;--t:#e8e8e8;--t2:#999;--mu:#555;--in:#222;--ib:#333}
+body{font-family:'EB Garamond',Georgia,serif;background:var(--bg);color:var(--t);min-height:100vh;display:flex}
+.wrap{display:flex;width:100%;min-height:100vh}
+/* Hero */
+.hero{flex:1;background:var(--red);color:#fff;display:flex;flex-direction:column;padding:52px 56px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;opacity:.05;background-image:radial-gradient(circle,#fff 1px,transparent 1px);background-size:28px 28px}
+.hi{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;justify-content:space-between}
+.hb{display:flex;align-items:center;gap:11px;margin-bottom:56px}
+.hbd{width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.hbn{font-size:16px;font-weight:600;font-family:'Inter',sans-serif}
+.hbt{font-size:12px;opacity:.65;font-family:'Inter',sans-serif;margin-top:1px}
+.hh{font-size:44px;font-weight:400;line-height:1.1;letter-spacing:-.025em;margin-bottom:18px}
+.hh em{font-style:italic;opacity:.8}
+.hd{font-size:14.5px;opacity:.72;line-height:1.72;max-width:440px;font-family:'Inter',sans-serif;font-weight:300;margin-bottom:44px}
+.hfeats{margin-bottom:44px}
+.hf{display:flex;align-items:flex-start;gap:11px;margin-bottom:12px;opacity:.82}
+.hf i{margin-top:4px;font-size:12px;flex-shrink:0;width:13px;opacity:.7}
+.hft{font-size:13.5px;font-family:'Inter',sans-serif;font-weight:300;line-height:1.5}
+.hft b{font-weight:600;opacity:1}
+.hst{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.hs{background:rgba(255,255,255,.13);border-radius:9px;padding:16px 14px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.hsn{font-size:26px;font-weight:500;letter-spacing:-.03em;line-height:1}
+.hsl{font-size:10px;opacity:.65;margin-top:5px;text-transform:uppercase;letter-spacing:.07em;font-family:'Inter',sans-serif}
+/* Panel */
+.panel{width:400px;flex-shrink:0;background:var(--sur);display:flex;flex-direction:column;justify-content:center;padding:52px 44px;border-left:1px solid var(--b)}
+.pb{display:flex;align-items:center;gap:8px;margin-bottom:36px}
+.pbd{width:18px;height:18px;background:var(--red);border-radius:3px;flex-shrink:0}
+.pbn{font-size:13px;font-weight:600;font-family:'Inter',sans-serif}
+.pt{font-size:24px;font-weight:400;letter-spacing:-.02em;margin-bottom:4px}
+.ps{font-size:13px;color:var(--mu);margin-bottom:24px;font-family:'Inter',sans-serif}
+.msg{font-size:12.5px;padding:9px 12px;border-radius:5px;margin-bottom:12px;display:none;font-family:'Inter',sans-serif}
+.msg.error{background:rgba(192,16,42,.07);border:1px solid rgba(192,16,42,.2);color:var(--red)}
+.msg.info{background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.2);color:#2563eb}
+.fld{margin-bottom:13px}
+label{display:block;font-size:11.5px;font-weight:500;color:var(--mu);margin-bottom:4px;font-family:'Inter',sans-serif}
+input[type=email],input[type=password]{width:100%;padding:9px 10px;border:1px solid var(--ib);border-radius:5px;font-family:'Inter',sans-serif;font-size:13.5px;color:var(--t);background:var(--in);outline:none;transition:border-color .12s}
+input:focus{border-color:var(--red)}
+.btn-login{width:100%;padding:10px;background:var(--red);color:#fff;border:none;border-radius:5px;font-family:'Inter',sans-serif;font-size:13.5px;font-weight:500;cursor:pointer;margin-top:4px;transition:filter .12s}
+.btn-login:hover{filter:brightness(.9)}.btn-login:disabled{opacity:.55;cursor:not-allowed}
+.div{text-align:center;font-size:11.5px;color:var(--mu);margin:16px 0;font-family:'Inter',sans-serif;position:relative}
+.div::before,.div::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--b)}
+.div::before{left:0}.div::after{right:0}
+.reg{text-align:center;font-size:13px;color:var(--mu);font-family:'Inter',sans-serif}
+.reg a{color:var(--red);font-weight:500;text-decoration:underline}
+.pft{margin-top:24px;font-size:11px;color:var(--mu);text-align:center;font-family:'Inter',sans-serif}
+.pft b{color:var(--red);font-weight:600}
+.tm{position:fixed;top:14px;right:14px;width:28px;height:28px;border-radius:5px;background:var(--sur);border:1px solid var(--b);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:11px;z-index:50}
+@media(max-width:900px){.hero{display:none}.panel{width:100%;border-left:none;min-height:100vh}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="hi">
+      <div>
+        <div class="hb"><div class="hbd"><i class="fas fa-droplet"></i></div><div><div class="hbn">HemoLink Kenya</div><div class="hbt">Blood Bank Management System</div></div></div>
+        <h1 class="hh">Every drop<br><em>saves a life.</em></h1>
+        <p class="hd">A unified platform for Kenya's blood banking network — connecting donors, recipients, and facilities to ensure blood is always available when it matters most.</p>
+        <div class="hfeats">
+          <div class="hf"><i class="fas fa-users"></i><div class="hft"><b>Member Management</b> — Complete profiles with medical screening and eligibility tracking</div></div>
+          <div class="hf"><i class="fas fa-boxes-stacked"></i><div class="hft"><b>Real-time Inventory</b> — Track blood units, expiry dates, and receive critical alerts</div></div>
+          <div class="hf"><i class="fas fa-file-medical"></i><div class="hft"><b>Medical Reports & Appointments</b> — Manage clinical records and schedules</div></div>
+          <div class="hf"><i class="fas fa-map"></i><div class="hft"><b>Facility Network Map</b> — Live blood availability across all registered sites</div></div>
+        </div>
+      </div>
+      <div class="hst">
+        <div class="hs"><div class="hsn">47</div><div class="hsl">Counties Served</div></div>
+        <div class="hs"><div class="hsn">500+</div><div class="hsl">Facilities</div></div>
+        <div class="hs"><div class="hsn">98K+</div><div class="hsl">Lives Saved</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="pb"><div class="pbd"></div><span class="pbn">HemoLink</span></div>
+    <h2 class="pt">Welcome back</h2>
+    <p class="ps">Sign in to your account to continue</p>
+    <div class="msg" id="msg"></div>
+    <form id="lf">
+      <div class="fld"><label for="email">Email address</label><input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email"></div>
+      <div class="fld"><label for="pw">Password</label><input type="password" id="pw" name="password" placeholder="••••••••" required autocomplete="current-password"></div>
+      <button type="submit" class="btn-login" id="lb">Sign in</button>
+    </form>
+    <div class="div">or</div>
+    <p class="reg">New here? <a href="/register">Create an account</a></p>
+    <p class="pft"><b>mkenya</b> — 20090 | All Rights Reserved | 2026</p>
+  </div>
+</div>
+<button class="tm" onclick="tgl()" id="tmb" title="Toggle theme"><i id="tmi" class="fas fa-moon"></i></button>
+<script>
+function fill(e,p){document.getElementById('email').value=e;document.getElementById('pw').value=p;}
+document.getElementById('lf').addEventListener('submit',async function(e){
+  e.preventDefault();
+  var btn=document.getElementById('lb'),m=document.getElementById('msg');
+  btn.textContent='Signing in\u2026';btn.disabled=true;m.style.display='none';
+  var fd=new FormData(e.target);
+  var r=await fetch('/login',{method:'POST',body:new URLSearchParams(fd)});
+  var d=await r.json();
+  if(d.success){window.location.href=d.redirect;}
+  else{m.className='msg '+(d.pending?'info':'error');m.textContent=d.message;m.style.display='block';btn.textContent='Sign in';btn.disabled=false;}
+});
+function at(t){document.documentElement.className=t;localStorage.setItem('hl_theme',t);var i=document.getElementById('tmi');if(i)i.className=t==='dark'?'fas fa-sun':'fas fa-moon';}
+function tgl(){at(document.documentElement.className==='dark'?'light':'dark');}
+(function(){var i=document.getElementById('tmi');if(i)i.className=document.documentElement.className==='dark'?'fas fa-sun':'fas fa-moon';})();
+</script>
+</body>
+</html>

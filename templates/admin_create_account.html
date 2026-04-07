@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}Create Account{% endblock %}
+{% block page_title %}Create Account{% endblock %}
+{% block content %}
+
+<div class="ph">
+  <div>
+    <h1 class="ph-tt">Create Account</h1>
+    <p class="ph-sub">Create a new user or admin account for this facility</p>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px">
+
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b)">Account Details</div>
+
+    <div id="formMsg" style="display:none;padding:9px 12px;border-radius:6px;font-size:12.5px;margin-bottom:14px"></div>
+
+    <form id="createForm">
+      <div class="form-group">
+        <label class="form-label">Role <span style="color:var(--red)">*</span></label>
+        <select name="role" class="form-select" required id="roleSelect" onchange="handleRoleChange()">
+          <option value="donor">Donor</option>
+          <option value="recipient">Recipient</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <div id="adminNotice" style="display:none;padding:9px 12px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:6px;font-size:12px;color:#d97706;margin-bottom:12px">
+        <i class="fas fa-triangle-exclamation" style="margin-right:6px"></i>
+        Admin accounts require approval from another admin before they can log in.
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name <span style="color:var(--red)">*</span></label>
+          <input type="text" name="first_name" class="form-control" placeholder="e.g. Jane" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name <span style="color:var(--red)">*</span></label>
+          <input type="text" name="last_name" class="form-control" placeholder="e.g. Odhiambo" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email <span style="color:var(--red)">*</span></label>
+        <input type="email" name="email" class="form-control" placeholder="user@example.com" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Password <span style="color:var(--red)">*</span></label>
+          <input type="password" name="password" class="form-control" placeholder="Min 6 characters" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="tel" name="phone" class="form-control" placeholder="+254 7XX XXX XXX">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Facility</label>
+        <select name="facility_id" class="form-select">
+          <option value="">Current facility ({{ current_user.facility.name }})</option>
+          {% for f in facilities %}
+          <option value="{{ f.id }}" {% if f.id == current_user.facility_id %}selected{% endif %}>{{ f.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+
+    <div style="display:flex;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--b);margin-top:4px">
+      <button class="btn btn-secondary" style="margin-right:8px" onclick="document.getElementById('createForm').reset();document.getElementById('formMsg').style.display='none'">Clear</button>
+      <button class="btn btn-primary" onclick="submitCreate()">Create Account</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b)">Optional Details</div>
+
+    <form id="extraForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">National ID</label>
+          <input type="text" name="national_id" class="form-control" placeholder="e.g. 12345678">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Blood Type</label>
+          <select name="blood_type" class="form-select">
+            <option value="">Unknown</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+            <option>O+</option><option>O-</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date of Birth</label>
+          <input type="date" name="date_of_birth" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gender</label>
+          <select name="gender" class="form-select">
+            <option value="">Select…</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">County</label>
+        <input type="text" name="county" class="form-control" placeholder="e.g. Nairobi">
+      </div>
+    </form>
+
+    <div style="margin-top:20px;padding:14px;background:var(--sur2);border-radius:6px;border:1px solid var(--b)">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--t2)">Account approval rules</div>
+      <div style="font-size:12px;color:var(--mu);line-height:1.7">
+        <div>• <strong style="color:var(--t)">Donors & Recipients</strong> — approved immediately, can log in right away</div>
+        <div>• <strong style="color:var(--t)">Admins</strong> — created in a pending state, require approval from a different admin at the same facility before they can access the system</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function handleRoleChange() {
+  const role = document.getElementById('roleSelect').value;
+  document.getElementById('adminNotice').style.display = role === 'admin' ? 'block' : 'none';
+}
+
+async function submitCreate() {
+  const f1 = document.getElementById('createForm');
+  const f2 = document.getElementById('extraForm');
+  const msg = document.getElementById('formMsg');
+
+  // Basic validation
+  const required = f1.querySelectorAll('[required]');
+  for(const el of required){
+    if(!el.value.trim()){el.focus();showMsg('Please fill in all required fields.','error');return;}
+  }
+
+  const fd = new FormData(f1);
+  new FormData(f2).forEach((v,k)=>fd.append(k,v));
+
+  const btn = event.target;
+  btn.textContent='Creating…';btn.disabled=true;
+
+  const r = await fetch('/admin/create-account',{method:'POST',body:new URLSearchParams(fd)});
+  const data = await r.json();
+
+  if(data.success){
+    showMsg(data.message,'success');
+    f1.reset();f2.reset();
+    document.getElementById('adminNotice').style.display='none';
+  } else {
+    showMsg(data.message,'error');
+  }
+  btn.textContent='Create Account';btn.disabled=false;
+}
+
+function showMsg(text,type){
+  const el=document.getElementById('formMsg');
+  el.style.display='block';
+  el.style.background=type==='success'?'rgba(22,163,74,.08)':'rgba(200,16,46,.08)';
+  el.style.border=`1px solid ${type==='success'?'rgba(22,163,74,.25)':'rgba(200,16,46,.25)'}`;
+  el.style.color=type==='success'?'#16a34a':'var(--red)';
+  el.textContent=text;
+}
+</script>
+{% endblock %}

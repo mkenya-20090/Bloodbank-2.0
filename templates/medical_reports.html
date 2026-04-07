@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% block title %}Medical Reports — HemoLink{% endblock %}
+{% block page_title %}Medical Reports{% endblock %}
+
+{% block content %}
+
+<div class="ph">
+  <div>
+    <h1 class="ph-tt">Medical Reports</h1>
+    <p class="ph-sub">
+      {% if current_user.role == 'admin' %}
+        All clinical reports at {{ current_user.facility.name if current_user.facility else 'your facility' }}
+      {% else %}
+        Your submitted medical records
+      {% endif %}
+    </p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('submitMo')">
+    <i class="fas fa-plus"></i> New Report
+  </button>
+</div>
+
+{% if reports %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          {% if current_user.role == 'admin' %}<th>Patient</th>{% endif %}
+          <th>Title</th>
+          <th>Type</th>
+          <th>Vitals</th>
+          <th>Submitted</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in reports %}
+      <tr>
+        {% if current_user.role == 'admin' %}
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="av" style="width:26px;height:26px;font-size:10px">{{ r.user.first_name[0] }}{{ r.user.last_name[0] }}</div>
+            <div>
+              <div style="font-weight:500;font-size:13px">{{ r.user.first_name }} {{ r.user.last_name }}</div>
+              <div style="font-size:11px;color:var(--mu)">{{ r.user.role|title }}</div>
+            </div>
+          </div>
+        </td>
+        {% endif %}
+        <td style="font-weight:500;font-size:13px;max-width:200px">{{ r.title }}</td>
+        <td><span class="bg bg-b">{{ r.report_type.replace('_',' ')|title }}</span></td>
+        <td style="font-size:12px;color:var(--mu);font-family:'Inter',sans-serif">
+          {% set vitals = [] %}
+          {% if r.hemoglobin %}{% set _ = vitals.append('Hb ' ~ r.hemoglobin ~ 'g/dL') %}{% endif %}
+          {% if r.blood_pressure %}{% set _ = vitals.append(r.blood_pressure) %}{% endif %}
+          {% if r.pulse %}{% set _ = vitals.append(r.pulse ~ 'bpm') %}{% endif %}
+          {% if vitals %}{{ vitals|join(' · ') }}{% else %}<span style="color:var(--b2)">—</span>{% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--mu);font-family:'Inter',sans-serif;white-space:nowrap">
+          {{ r.created_at.strftime('%d %b %Y') }}
+        </td>
+        <td>
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-secondary btn-sm" onclick="previewPDF({{ r.id }}, '{{ r.title|e }}')" title="Preview PDF">
+              <i class="fas fa-file-pdf" style="color:var(--red)"></i> Preview
+            </button>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteReport({{ r.id }})" title="Delete">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="es"><i class="fas fa-file-medical"></i><p>No medical reports yet. Submit the first one above.</p></div>
+</div>
+{% endif %}
+
+<!-- ── Submit Report Modal ── -->
+<div class="modal-overlay" id="submitMo">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">New Medical Report</div>
+      <button class="modal-close" onclick="closeModal('submitMo')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="repForm">
+        {% if current_user.role == 'admin' %}
+        <div class="form-group">
+          <label class="form-label">Patient <span style="color:var(--red)">*</span></label>
+          <select name="user_id" class="form-select" required>
+            <option value="">Select member…</option>
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.first_name }} {{ u.last_name }} ({{ u.role|title }} · {{ u.blood_type or '?' }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Report Title <span style="color:var(--red)">*</span></label>
+            <input type="text" name="title" class="form-control" placeholder="e.g. Pre-donation screening" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Report Type</label>
+            <select name="report_type" class="form-select">
+              <option value="general">General</option>
+              <option value="pre_donation">Pre-Donation</option>
+              <option value="post_donation">Post-Donation</option>
+              <option value="screening">Screening</option>
+              <option value="follow_up">Follow-up</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Clinical Summary <span style="color:var(--red)">*</span></label>
+          <textarea name="content" class="form-control" rows="4" placeholder="Describe clinical findings, observations, and assessment…" required style="min-height:90px;resize:vertical"></textarea>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;font-family:'Inter',sans-serif;margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--b)">
+          Vitals <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+          <div class="form-group">
+            <label class="form-label">Blood Pressure</label>
+            <input type="text" name="blood_pressure" class="form-control" placeholder="e.g. 120/80 mmHg">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Haemoglobin (g/dL)</label>
+            <input type="number" name="hemoglobin" class="form-control" placeholder="e.g. 13.5" step="0.1" min="5" max="25">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Weight (kg)</label>
+            <input type="number" name="weight_kg" class="form-control" placeholder="e.g. 70" min="30" max="250">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Temperature (°C)</label>
+            <input type="number" name="temperature" class="form-control" placeholder="e.g. 36.6" step="0.1" min="35" max="42">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pulse (bpm)</label>
+            <input type="number" name="pulse" class="form-control" placeholder="e.g. 72" min="30" max="200">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Additional Notes</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="Follow-up actions, recommendations…" style="resize:vertical"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('submitMo')">Cancel</button>
+      <button class="btn btn-primary" id="submitBtn" onclick="submitReport()"><i class="fas fa-save"></i> Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PDF Preview Modal ── -->
+<div class="modal-overlay" id="pdfMo">
+  <div class="modal modal-lg" style="max-width:760px;height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div class="modal-title"><i class="fas fa-file-pdf" style="color:var(--red);margin-right:6px"></i><span id="pdfTitle">Medical Report</span></div>
+      <button class="modal-close" onclick="closePDF()">×</button>
+    </div>
+    <div style="flex:1;overflow:hidden;position:relative">
+      <iframe id="pdfFrame" style="width:100%;height:100%;border:none" src="about:blank"></iframe>
+      <div id="pdfLoader" style="position:absolute;inset:0;background:var(--sur);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;font-family:'Inter',sans-serif;font-size:13px;color:var(--mu)">
+        <div style="width:32px;height:32px;border:3px solid var(--b);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite"></div>
+        Generating PDF…
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-shrink:0">
+      <button class="btn btn-ghost" onclick="closePDF()">Close</button>
+      <a id="pdfDownload" href="#" class="btn btn-primary" download>
+        <i class="fas fa-download"></i> Download PDF
+      </a>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<script>
+async function submitReport() {
+  const form = document.getElementById('repForm');
+  const btn = document.getElementById('submitBtn');
+  const title = form.querySelector('[name=title]');
+  const content = form.querySelector('[name=content]');
+  if (!title.value.trim()) { title.focus(); showToast('Report title is required.', 'error'); return; }
+  if (!content.value.trim()) { content.focus(); showToast('Clinical summary is required.', 'error'); return; }
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting…'; btn.disabled = true;
+  const fd = new FormData(form);
+  const r = await fetch('/medical-reports/submit', {method: 'POST', body: new URLSearchParams(fd)});
+  const d = await r.json();
+  if (d.success) {
+    showToast(d.message, 'success');
+    closeModal('submitMo');
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    showToast(d.message || 'Failed to submit.', 'error');
+    btn.innerHTML = '<i class="fas fa-save"></i> Submit Report'; btn.disabled = false;
+  }
+}
+
+let currentPdfUrl = null;
+
+function previewPDF(id, title) {
+  document.getElementById('pdfTitle').textContent = title;
+  document.getElementById('pdfLoader').style.display = 'flex';
+  const url = '/medical-reports/' + id + '/pdf';
+  currentPdfUrl = url;
+  document.getElementById('pdfDownload').href = url;
+  document.getElementById('pdfDownload').download = 'medical_report_' + id + '.pdf';
+  // Load in iframe
+  const frame = document.getElementById('pdfFrame');
+  frame.src = 'about:blank';
+  openModal('pdfMo');
+  setTimeout(() => {
+    frame.onload = () => { document.getElementById('pdfLoader').style.display = 'none'; };
+    frame.src = url;
+    // Fallback in case onload doesn't fire (inline PDF)
+    setTimeout(() => { document.getElementById('pdfLoader').style.display = 'none'; }, 2500);
+  }, 150);
+}
+
+function closePDF() {
+  closeModal('pdfMo');
+  document.getElementById('pdfFrame').src = 'about:blank';
+  document.getElementById('pdfLoader').style.display = 'flex';
+}
+
+async function deleteReport(id) {
+  if (!confirm('Delete this medical report permanently?')) return;
+  const r = await fetch('/medical-reports/' + id + '/delete', {method: 'POST'});
+  const d = await r.json();
+  showToast(d.message, d.success ? 'success' : 'error');
+  if (d.success) setTimeout(() => location.reload(), 900);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}Blood Requests — HemoLink
+{% endblock %}
+
+{% block page_title %}Blood Requests
+{% endblock %}
+
+{% block content %}
+
+{% set pending_n   = requests|selectattr('status','equalto','pending')|list|length %}
+{% set fulfilled_n = requests|selectattr('status','equalto','fulfilled')|list|length %}
+{% set rejected_n  = requests|selectattr('status','equalto','rejected')|list|length %}
+{% set critical_n  = requests|selectattr('urgency','equalto','critical')|list|length %}
+
+<div class="ph">
+  <div>
+    <h1 class="ph-tt">Blood Requests</h1>
+    <p class="ph-sub">{{ current_user.facility.name if current_user.facility else '' }} · {{ requests|length }} total</p>
+  </div>
+  {% if critical_n %}
+  <div class="al al-r al-compact">
+    <i class="fas fa-circle-exclamation"></i>
+    <span>{{ critical_n }} critical request{{ 's' if critical_n != 1 else '' }} need{{ 's' if critical_n == 1 else '' }} immediate attention</span>
+  </div>
+  {% endif %}
+</div>
+
+{# Filter bar #}
+<div class="filter-bar">
+  {% for label, val, cls, fval in [
+    ('All', requests|length, 'bg-n', 'all'),
+    ('Pending', pending_n, 'bg-a', 'pending'),
+    ('Fulfilled', fulfilled_n, 'bg-g', 'fulfilled'),
+    ('Rejected', rejected_n, 'bg-r', 'rejected'),
+  ] %}
+  <button class="req-filter filter-btn {% if loop.first %}on{% endif %}" data-f="{{ fval }}">
+    {{ label }}
+    <span class="filter-badge {{ cls }}">{{ val }}</span>
+  </button>
+  {% endfor %}
+  <input id="reqSearch" type="text" placeholder="Search patient or blood type…" class="req-search">
+</div>
+
+<div class="card card-requests">
+  {% if requests %}
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Blood Type</th>
+          <th>Units</th>
+          <th>Urgency</th>
+          <th>Reason</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for req in requests %}
+      <tr class="rrow {% if req.urgency == 'critical' and req.status == 'pending' %}crit-row{% endif %}"
+          data-f="{{ req.status }}"
+          data-search="{{ req.requester.first_name|lower }} {{ req.requester.last_name|lower }} {{ req.blood_type|lower }}"
+          data-id="{{ req.id }}"
+          data-type="{{ req.blood_type }}"
+          data-units="{{ req.units_needed }}"
+          data-name="{{ req.requester.first_name }} {{ req.requester.last_name }}">
+        <td>
+          <div class="patient-info">
+            <div class="av">{{ req.requester.first_name[0] }}{{ req.requester.last_name[0] }}</div>
+            <div>
+              <div class="patient-name">{{ req.requester.first_name }} {{ req.requester.last_name }}</div>
+              <div class="patient-email">{{ req.requester.email }}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="bb">{{ req.blood_type }}</span></td>
+        <td class="units-needed">{{ req.units_needed }}</td>
+        <td>
+          <span class="bg {% if req.urgency=='critical' %}bg-r{% elif req.urgency=='urgent' %}bg-a{% else %}bg-n{% endif %}">
+            {% if req.urgency == 'critical' %}<i class="fas fa-circle-exclamation"></i>{% endif %}
+            {{ req.urgency|title }}
+          </span>
+        </td>
+        <td class="reason-cell"
+            title="{{ req.reason or '' }}">{{ req.reason or '—' }}</td>
+        <td class="date-cell">{{ req.created_at.strftime('%d %b %Y') }}</td>
+        <td>
+          <span class="bg {% if req.status=='fulfilled' %}bg-g{% elif req.status=='pending' %}bg-a{% elif req.status=='rejected' %}bg-r{% else %}bg-n{% endif %}">
+            {{ req.status|title }}
+          </span>
+        </td>
+        <td>
+          {% if req.status == 'pending' %}
+          <div class="action-buttons">
+            <button class="btn btn-success btn-sm" onclick="openFulfill(this.closest('tr'))">
+              <i class="fas fa-check"></i> Fulfill
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="doReject('{{ req.id }}')" title="Reject blood request">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          {% else %}
+          <span class="no-action">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="es empty-state"><i class="fas fa-droplet"></i><p>No blood requests found.</p></div>
+  {% endif %}
+</div>
+
+{# Fulfill modal #}
+<div class="modal-overlay" id="fulfillMo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Fulfill Blood Request</div>
+      <button class="modal-close" onclick="closeModal('fulfillMo')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-box">
+        <div class="info-patient" id="fPatient">—</div>
+        <div class="info-details">
+          Requesting <strong id="fUnitsLbl">—</strong> unit(s) of <strong id="fType">—</strong>
+        </div>
+      </div>
+      <input type="hidden" id="fReqId">
+      <div class="form-group">
+        <label class="form-label">Units to Dispense</label>
+        <input type="number" id="fUnits" class="form-control" min="1" required placeholder="e.g. 2">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes <span class="optional-label">(optional)</span></label>
+        <textarea id="fNotes" class="form-control" rows="2" placeholder="Any additional notes for the record…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('fulfillMo')">Cancel</button>
+      <button class="btn btn-success" onclick="doFulfill()"><i class="fas fa-check"></i> Confirm & Dispense</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.crit-row{background:rgba(192,16,42,.03)!important}
+.al-compact{margin:0;padding:7px 13px}
+.filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filter-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border:1px solid var(--b);border-radius:6px;background:var(--sur);font-family:'Inter',sans-serif;font-size:12.5px;cursor:pointer;color:var(--t2)}
+.filter-badge{padding:1px 6px;border-radius:10px;font-size:10.5px;font-weight:600}
+.req-search{margin-left:auto;padding:6px 10px;border:1px solid var(--b);border-radius:6px;font-size:12.5px;font-family:'Inter',sans-serif;background:var(--in);color:var(--t);outline:none;width:220px}
+.card-requests{padding:0;overflow:hidden}
+.patient-info{display:flex;align-items:center;gap:8px}
+.av{width:28px;height:28px;font-size:10px}
+.patient-name{font-weight:500;font-size:13px}
+.patient-email{font-size:11px;color:var(--mu)}
+.bb{display:inline-block}
+.units-needed{font-weight:600;font-size:14px}
+.reason-cell{font-size:12px;color:var(--t2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.date-cell{font-size:12.5px;color:var(--t2)}
+.status-badge{display:inline-block}
+.action-buttons{display:flex;gap:5px}
+.info-box{background:rgba(192,16,42,.06);border:1px solid rgba(192,16,42,.15);border-radius:6px;padding:12px 14px;margin-bottom:16px}
+.info-patient{font-weight:500;font-size:13px}
+.info-details{font-size:12px;color:var(--t2);margin-top:3px}
+.empty-state{padding:48px}
+.no-action{font-size:11px;color:var(--mu)}
+.optional-label{color:var(--mu);font-size:11px}
+.required-label{color:var(--red)}
+</style>
+
+<script>
+// Filter & search
+const rFilters = document.querySelectorAll('.req-filter');
+rFilters.forEach(btn => {
+  btn.addEventListener('click', () => {
+    rFilters.forEach(b => { b.classList.remove('on'); b.style.borderColor='var(--b)'; b.style.color='var(--t2)'; });
+    btn.classList.add('on'); btn.style.borderColor='var(--red)'; btn.style.color='var(--t)';
+    applyFilter();
+  });
+});
+document.getElementById('reqSearch').addEventListener('input', applyFilter);
+
+function applyFilter() {
+  const f = document.querySelector('.req-filter.on').dataset.f;
+  const q = document.getElementById('reqSearch').value.toLowerCase().trim();
+  document.querySelectorAll('.rrow').forEach(row => {
+    const mf = f === 'all' || row.dataset.f === f;
+    const mq = !q || row.dataset.search.includes(q);
+    row.style.display = (mf && mq) ? '' : 'none';
+  });
+}
+
+// Fulfill
+function openFulfill(row) {
+  document.getElementById('fReqId').value   = row.dataset.id;
+  document.getElementById('fType').textContent    = row.dataset.type;
+  document.getElementById('fUnitsLbl').textContent = row.dataset.units;
+  document.getElementById('fPatient').textContent  = row.dataset.name;
+  document.getElementById('fUnits').value  = row.dataset.units;
+  document.getElementById('fUnits').max    = row.dataset.units;
+  document.getElementById('fNotes').value  = '';
+  openModal('fulfillMo');
+}
+
+async function doFulfill() {
+  const id    = document.getElementById('fReqId').value;
+  const units = document.getElementById('fUnits').value;
+  const notes = document.getElementById('fNotes').value;
+  if (!units || units < 1) { showToast('Enter a valid number of units.', 'error'); return; }
+  const fd = new FormData();
+  fd.append('units', units);
+  fd.append('notes', notes);
+  const r = await fetch('/admin/blood-requests/' + id + '/fulfill', { method: 'POST', body: fd });
+  const d = await r.json();
+  showToast(d.message, d.success ? 'success' : 'error');
+  if (d.success) { closeModal('fulfillMo'); setTimeout(() => location.reload(), 900); }
+}
+
+function doReject(id) {
+  document.getElementById('rejReqId').value = id;
+  document.getElementById('rejReqNotes').value = '';
+  openModal('rejectReqMo');
+}
+async function confirmReqReject() {
+  const id = document.getElementById('rejReqId').value;
+  const reason = document.getElementById('rejReqNotes').value.trim();
+  if (!reason) { showToast('Please provide a reason for rejection.', 'error'); return; }
+  const fd = new FormData(); fd.append('reason', reason);
+  const r = await fetch('/admin/blood-requests/' + id + '/reject', { method: 'POST', body: fd });
+  const d = await r.json();
+  showToast(d.message, d.success ? 'warning' : 'error');
+  if (d.success) { closeModal('rejectReqMo'); setTimeout(() => location.reload(), 900); }
+}
+</script>
+
+{# Reject Request Modal #}
+<div class="modal-overlay" id="rejectReqMo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Reject Blood Request</div>
+      <button class="modal-close" onclick="closeModal('rejectReqMo')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rejReqId">
+      <div class="form-group">
+        <label class="form-label">Reason for Rejection <span class="required-label">*</span></label>
+        <textarea id="rejReqNotes" class="form-control" rows="3" placeholder="Explain why this blood request cannot be fulfilled — this will be shared with the patient…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('rejectReqMo')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmReqReject()"><i class="fas fa-times"></i> Confirm Rejection</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

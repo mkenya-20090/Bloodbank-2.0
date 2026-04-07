@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Appointments — HemoLink{% endblock %}
+{% block page_title %}Appointments{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_appointments.css') }}">
+{% endblock %}
+
+{% block content %}
+
+{# ── Summary bar ── #}
+{% set total = appointments|length %}
+{% set pending_n = appointments|selectattr('status','equalto','pending')|list|length %}
+{% set approved_n = appointments|selectattr('status','equalto','approved')|list|length %}
+{% set completed_n = appointments|selectattr('status','equalto','completed')|list|length %}
+{% set rejected_n = appointments|selectattr('status','equalto','rejected')|list|length %}
+
+<div class="ph">
+  <div>
+    <h1 class="ph-tt">Appointments</h1>
+    <p class="ph-sub">{{ current_user.facility.name if current_user.facility else '' }} · {{ total }} total</p>
+  </div>
+</div>
+
+{# Stats row #}
+<div class="appt-stats-row">
+  {% for label, val, cls in [('All', total, 'bg-n'), ('Pending', pending_n, 'bg-a'), ('Approved', approved_n, 'bg-b'), ('Completed', completed_n, 'bg-g'), ('Rejected', rejected_n, 'bg-r')] %}
+  <button class="appt-filter {% if loop.first %}on{% endif %}" data-f="{{ label|lower }}">
+    {{ label }}
+    <span class="{{ cls }} appt-stat-badge">{{ val }}</span>
+  </button>
+  {% endfor %}
+  <input id="apptSearch" type="text" placeholder="Search patient…" class="appt-search-input">
+</div>
+
+{# Table #}
+<div class="card appt-table-container">
+  {% if appointments %}
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Type</th>
+          <th>Date & Time</th>
+          <th>Blood Type</th>
+          <th>Reason</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="apptBody">
+      {% for a in appointments %}
+      <tr class="arow" data-status="{{ a.status }}"
+          data-search="{{ a.user.first_name|lower }} {{ a.user.last_name|lower }} {{ a.user.email|lower }}">
+        <td>
+          <div class="appt-patient-cell">
+            <div class="av appt-avatar">{{ a.user.first_name[0] }}{{ a.user.last_name[0] }}</div>
+            <div>
+              <div class="appt-patient-name">{{ a.user.first_name }} {{ a.user.last_name }}</div>
+              <div class="appt-patient-contact">{{ a.user.phone or a.user.email }}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span class="bg {% if a.type=='donation' %}bg-r{% else %}bg-b{% endif %}">
+            <i class="fas fa-{% if a.type=='donation' %}heart{% else %}hand-holding-medical{% endif %}"></i>
+            {{ a.type|title }}
+          </span>
+        </td>
+        <td>
+          <div class="appt-date">{{ a.appointment_date.strftime('%d %b %Y') }}</div>
+          <div class="appt-time">{{ a.appointment_time or 'Any time' }}</div>
+        </td>
+        <td>
+          {% if a.blood_type_needed %}
+            <span class="bb">{{ a.blood_type_needed }}</span>
+          {% elif a.user.blood_type %}
+            <span class="bb">{{ a.user.blood_type }}</span>
+          {% else %}
+            <span class="appt-blood-type-empty">—</span>
+          {% endif %}
+        </td>
+        <td class="appt-reason" title="{{ a.reason or '' }}">
+          {{ a.reason or '—' }}
+        </td>
+        <td>
+          <span class="bg {% if a.status=='approved' %}bg-g{% elif a.status=='pending' %}bg-a{% elif a.status=='rejected' %}bg-r{% elif a.status=='completed' %}bg-b{% else %}bg-n{% endif %}">
+            {{ a.status|title }}
+          </span>
+          {% if a.admin_notes %}
+          <div class="appt-admin-notes" title="{{ a.admin_notes }}">{{ a.admin_notes }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <div class="appt-actions">
+            {% if a.status == 'pending' %}
+              <button class="btn btn-success btn-sm" onclick="doApprove('{{ a.id }}')"><i class="fas fa-check"></i> Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="openReject('{{ a.id }}')" title="Reject"><i class="fas fa-times"></i></button>
+            {% elif a.status == 'approved' %}
+              <button class="btn btn-primary btn-sm" onclick="doComplete('{{ a.id }}')"><i class="fas fa-check-double"></i> Complete</button>
+              <button class="btn btn-ghost btn-sm" onclick="openReject('{{ a.id }}')" title="Reject"><i class="fas fa-times"></i></button>
+            {% else %}
+              <span class="appt-no-actions">—</span>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="es appt-empty-state"><i class="fas fa-calendar-xmark"></i><p>No appointments yet.</p></div>
+  {% endif %}
+</div>
+
+{# Reject modal #}
+<div class="modal-overlay" id="rejectMo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Reject Appointment</div>
+      <button class="modal-close" onclick="closeModal('rejectMo')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rejId">
+      <div class="form-group">
+        <label class="form-label">Reason <span class="appt-label-note">(shown to patient)</span></label>
+        <textarea id="rejNotes" class="form-control" rows="3" placeholder="Explain why this appointment cannot proceed…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('rejectMo')">Cancel</button>
+      <button class="btn btn-danger" onclick="doReject()"><i class="fas fa-times"></i> Confirm Rejection</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Filter & search
+const filterBtns = document.querySelectorAll('.appt-filter');
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterBtns.forEach(b => { b.classList.remove('on'); b.style.borderColor = 'var(--b)'; b.style.color = 'var(--t2)'; b.style.background = 'var(--sur)'; });
+    btn.classList.add('on');
+    btn.style.borderColor = 'var(--red)';
+    btn.style.color = 'var(--t)';
+    btn.style.background = 'var(--sur)';
+    applyFilter();
+  });
+});
+document.getElementById('apptSearch').addEventListener('input', applyFilter);
+
+function applyFilter() {
+  const f = document.querySelector('.appt-filter.on').dataset.f;
+  const q = document.getElementById('apptSearch').value.toLowerCase().trim();
+  document.querySelectorAll('.arow').forEach(row => {
+    const matchF = f === 'all' || row.dataset.status === f;
+    const matchQ = !q || row.dataset.search.includes(q);
+    row.style.display = (matchF && matchQ) ? '' : 'none';
+  });
+}
+
+// Actions
+async function doApprove(id) {
+  const fd = new FormData(); fd.append('notes', '');
+  const r = await fetch('/admin/appointments/' + id + '/approve', { method: 'POST', body: fd });
+  const d = await r.json();
+  showToast(d.message, d.success ? 'success' : 'error');
+  if (d.success) setTimeout(() => location.reload(), 900);
+}
+
+async function doComplete(id) {
+  if (!confirm('Mark as completed?\n\nFor donation appointments this will record the donation and update blood inventory.')) return;
+  const r = await fetch('/admin/appointments/' + id + '/complete', { method: 'POST', body: new FormData() });
+  const d = await r.json();
+  showToast(d.message, d.success ? 'success' : 'error');
+  if (d.success) setTimeout(() => location.reload(), 1000);
+}
+
+function openReject(id) {
+  document.getElementById('rejId').value = id;
+  document.getElementById('rejNotes').value = '';
+  openModal('rejectMo');
+}
+
+async function doReject() {
+  const id = document.getElementById('rejId').value;
+  const notes = document.getElementById('rejNotes').value.trim();
+  if (!notes) { showToast('Please provide a reason for rejection.', 'error'); return; }
+  const fd = new FormData(); fd.append('notes', notes);
+  const r = await fetch('/admin/appointments/' + id + '/reject', { method: 'POST', body: fd });
+  const d = await r.json();
+  showToast(d.message, d.success ? 'warning' : 'error');
+  if (d.success) { closeModal('rejectMo'); setTimeout(() => location.reload(), 900); }
+}
+</script>
+{% endblock %}

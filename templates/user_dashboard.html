@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block page_title %}My Dashboard{% endblock %}
+{% block page_subtitle %}Welcome back, {{ current_user.first_name }}!{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- ELIGIBILITY BANNER -->
+{% if current_user.role == 'donor' %}
+<div class="alert {% if eligible %}alert-success{% else %}alert-warning{% endif %} mb-3 eligibility-banner">
+  <i class="fas fa-{% if eligible %}check-circle{% else %}clock{% endif %}"></i>
+  <span>
+    {% if eligible %}
+    <strong>You are eligible to donate!</strong> Your last donation was {% if current_user.last_donation_date %}{{ current_user.last_donation_date.strftime('%d %b %Y') }}{% else %}never{% endif %}. Book an appointment today.
+    {% else %}
+    <strong>Not yet eligible.</strong> You can donate again in <strong>{{ days_until_eligible }} days</strong> (90-day waiting period between donations).
+    {% endif %}
+  </span>
+  {% if eligible %}<a href="#" onclick="openModal('apptModal')" class="btn btn-success btn-sm" style="margin-left:auto"><i class="fas fa-calendar-plus"></i> Book Now</a>{% endif %}
+</div>
+{% endif %}
+
+<!-- PROFILE OVERVIEW -->
+<div class="grid-2 mb-3">
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-tt">My Profile</div>
+      <a href="{{ url_for('profile') }}" class="btn btn-secondary btn-sm">Edit</a>
+    </div>
+    <div class="profile-grid">
+      <div class="user-avatar profile-avatar">
+        {{ current_user.first_name[0] }}{{ current_user.last_name[0] }}
+      </div>
+      <div>
+        <div class="profile-info-main">{{ current_user.first_name }} {{ current_user.last_name }}</div>
+        <div class="profile-info-email">{{ current_user.email }}</div>
+        <div class="profile-badges">
+          <span class="badge badge-red">{{ current_user.role | title }}</span>
+          {% if current_user.blood_type %}<span class="blood-badge">{{ current_user.blood_type }}</span>{% endif %}
+          {% if current_user.is_approved %}<span class="badge badge-green"><i class="fas fa-check"></i> Approved</span>{% else %}<span class="badge badge-gold"><i class="fas fa-clock"></i> Pending</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="profile-details-grid">
+      <div class="profile-detail-item">
+        <div class="profile-detail-label">Phone</div>
+        <div class="profile-detail-value">{{ current_user.phone or '—' }}</div>
+      </div>
+      <div class="profile-detail-item">
+        <div class="profile-detail-label">County</div>
+        <div class="profile-detail-value">{{ current_user.county or '—' }}</div>
+      </div>
+      <div class="profile-detail-item">
+        <div class="profile-detail-label">Last Donation</div>
+        <div class="profile-detail-value">{{ current_user.last_donation_date.strftime('%d %b %Y') if current_user.last_donation_date else 'Never' }}</div>
+      </div>
+      <div class="profile-detail-item">
+        <div class="profile-detail-label">Total Donations</div>
+        <div class="profile-detail-value profile-detail-donations">{{ my_donations|length }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-tt">Quick Actions</div>
+    </div>
+    <div class="quick-actions">
+      {% if current_user.role == 'donor' %}
+      <button onclick="openModal('apptModal')" class="btn btn-primary w-full action-btn">
+        <i class="fas fa-calendar-plus"></i> Schedule Donation
+      </button>
+      {% endif %}
+      <button onclick="openModal('requestModal')" class="btn btn-green w-full action-btn">
+        <i class="fas fa-tint"></i> Request Blood
+      </button>
+      <button onclick="openModal('matchModal')" class="btn btn-secondary w-full action-btn">
+        <i class="fas fa-magic"></i> Find Compatible Donors
+      </button>
+      {% if current_user.facility_id %}
+      <div class="facility-info">
+        <div class="facility-label">Your Facility</div>
+        <div class="facility-name">{{ current_user.facility.name }}</div>
+        <div class="facility-details">{{ current_user.facility.county }} · {{ current_user.facility.phone }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- BLOOD INVENTORY (readonly) -->
+{% if inventory %}
+<div class="card mb-3">
+  <div class="card-hd">
+    <div class="card-tt"><i class="fas fa-box-open" style="color:var(--red);margin-right:8px"></i>Facility Blood Availability</div>
+    <span style="font-size:12px;color:var(--mu)">{{ current_user.facility.name if current_user.facility else '' }}</span>
+  </div>
+  <div class="inv-grid">
+    {% for inv in inventory %}
+    <div class="inv-card {% if inv.units_available < 5 %}critical{% elif inv.units_available < 10 %}low{% endif %}">
+      <div class="bt-big">{{ inv.blood_type }}</div>
+      <div class="units">{{ inv.units_available }}</div>
+      <div class="units-label">units</div>
+      {% if inv.units_available < 5 %}
+      <div style="font-size:10px;color:#dc2626;margin-top:4px;font-weight:600">CRITICAL</div>
+      {% elif inv.units_available < 10 %}
+      <div style="font-size:10px;color:#d97706;margin-top:4px;font-weight:600">LOW</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- MY APPOINTMENTS -->
+<div class="card mb-3">
+  <div class="card-hd">
+    <div class="card-tt"><i class="fas fa-calendar-alt" style="color:var(--red);margin-right:8px"></i>My Appointments</div>
+    <button onclick="openModal('apptModal')" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Book New</button>
+  </div>
+  {% if my_appointments %}
+  <div class="tw">
+    <table>
+      <thead><tr><th>Date & Time</th><th>Type</th><th>Facility</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>
+      {% for a in my_appointments[:8] %}
+      <tr>
+        <td>
+          <div style="font-weight:600;font-size:13px">{{ a.appointment_date.strftime('%d %b %Y') }}</div>
+          <div style="font-size:11px;color:var(--mu)">{{ a.appointment_time or '—' }}</div>
+        </td>
+        <td><span class="badge {% if a.type=='donation' %}badge-red{% else %}badge-blue{% endif %}">{{ a.type }}</span></td>
+        <td style="font-size:13px">{{ a.facility.name[:25] }}</td>
+        <td><span class="badge {% if a.status=='approved' %}badge-green{% elif a.status=='pending' %}badge-gold{% elif a.status=='rejected' %}badge-danger{% else %}badge-gray{% endif %}">{{ a.status }}</span></td>
+        <td style="font-size:12px;color:var(--mu)">{{ a.admin_notes or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="es"><i class="fas fa-calendar"></i><p>No appointments yet. Book your first donation!</p></div>
+  {% endif %}
+</div>
+
+<!-- MY BLOOD REQUESTS -->
+{% if my_blood_requests %}
+<div class="card">
+  <div class="card-hd">
+    <div class="card-tt"><i class="fas fa-hand-holding-medical" style="color:var(--red);margin-right:8px"></i>My Blood Requests</div>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Blood Type</th><th>Units</th><th>Urgency</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>
+      {% for r in my_blood_requests %}
+      <tr>
+        <td><span class="blood-badge" style="width:28px;height:28px;font-size:10px">{{ r.blood_type }}</span></td>
+        <td style="font-weight:700">{{ r.units_needed }}</td>
+        <td><span class="badge {% if r.urgency=='critical' %}badge-danger{% elif r.urgency=='urgent' %}badge-gold{% else %}badge-gray{% endif %}">{{ r.urgency }}</span></td>
+        <td><span class="badge {% if r.status=='fulfilled' %}badge-green{% elif r.status=='pending' %}badge-gold{% else %}badge-gray{% endif %}">{{ r.status }}</span></td>
+        <td style="font-size:12px;color:var(--mu)">{{ r.created_at.strftime('%d %b %Y') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- BOOK APPOINTMENT MODAL -->
+<div class="modal-overlay" id="apptModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-calendar-plus" style="color:var(--red);margin-right:8px"></i>Book Appointment</div>
+      <button class="modal-close" onclick="closeModal('apptModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="apptForm">
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Appointment Type</label>
+        <div class="appt-type-container">
+          <label class="appt-type-label" id="donType">
+            <input type="radio" name="type" value="donation" checked onchange="toggleApptType()"> <i class="fas fa-heart icon-red"></i> Donation
+          </label>
+          <label class="appt-type-label" id="reqType">
+            <input type="radio" name="type" value="request" onchange="toggleApptType()"> <i class="fas fa-hand-holding-medical icon-green"></i> Request
+          </label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Facility</label>
+          <select name="facility_id" class="form-select" required>
+            {% for f in facilities %}<option value="{{ f.id }}" {% if f.id == current_user.facility_id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preferred Date</label>
+          <input type="date" name="appointment_date" id="apptDateInput" class="form-control" required min="{{ today }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Preferred Time</label>
+          <select name="appointment_time" class="form-select">
+            <option value="">Any time</option>
+            <option>08:00 AM</option><option>09:00 AM</option><option>10:00 AM</option>
+            <option>11:00 AM</option><option>02:00 PM</option><option>03:00 PM</option><option>04:00 PM</option>
+          </select>
+        </div>
+        <div class="form-group" id="unitsField" style="display:none">
+          <label class="form-label">Units Needed</label>
+          <input type="number" name="units_needed" class="form-control" min="1" max="10" value="1">
+        </div>
+      </div>
+      <div class="form-group" id="bloodTypeField" style="display:none">
+        <label class="form-label">Blood Type Needed</label>
+        <select name="blood_type_needed" class="form-select">
+          <option value="">Any compatible</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason / Notes</label>
+        <textarea name="reason" class="form-control" rows="2" placeholder="Any additional information..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('apptModal')">Cancel</button>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-calendar-check"></i> Book Appointment</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+<!-- REQUEST BLOOD MODAL -->
+<div class="modal-overlay" id="requestModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-tint" style="color:var(--red);margin-right:8px"></i>Request Blood</div>
+      <button class="modal-close" onclick="closeModal('requestModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="requestForm">
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Blood Type Needed</label>
+          <select name="blood_type" class="form-select" required>
+            <option value="">Select</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Units Needed</label>
+          <input type="number" name="units_needed" class="form-control" min="1" max="20" value="1" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Urgency Level</label>
+          <select name="urgency" class="form-select" required>
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent (within 24hrs)</option>
+            <option value="critical">CRITICAL (immediate)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Facility</label>
+          <select name="facility_id" class="form-select">
+            {% for f in facilities %}<option value="{{ f.id }}" {% if f.id == current_user.facility_id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason / Medical Indication</label>
+        <textarea name="reason" class="form-control" rows="3" placeholder="e.g. Post-surgery, Sickle cell crisis, Accident..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('requestModal')">Cancel</button>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Request</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+<!-- DONOR MATCHING MODAL -->
+<div class="modal-overlay" id="matchModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-droplet" style="color:var(--red);margin-right:6px"></i>Find Compatible Donors</div>
+      <button class="modal-close" onclick="closeModal('matchModal')" title="Close"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="match-filter-row">
+        <div class="match-filter-col">
+          <label class="form-label">Blood Type Needed</label>
+          <select id="matchBloodType" class="form-select">
+            <option value="">Select type</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="match-filter-col">
+          <label class="form-label">Facility</label>
+          <select id="matchFacility" class="form-select">
+            <option value="">All facilities</option>
+            {% for f in facilities %}<option value="{{ f.id }}" {% if f.id == current_user.facility_id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="match-filter-action">
+          <button class="btn btn-primary" onclick="runMatch()"><i class="fas fa-search"></i> Find Donors</button>
+        </div>
+      </div>
+      <div id="matchResults"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const today = new Date().toISOString().split('T')[0];
+const nextEligibleDate = '{{ next_eligible_date.strftime("%Y-%m-%d") if next_eligible_date else today }}';
+const isDonorEligible = {{ 'true' if eligible else 'false' }};
+
+function updateDateMin() {
+  const isDonation = document.querySelector('[name=type]:checked')?.value === 'donation';
+  const dateInput = document.getElementById('apptDateInput');
+  if (isDonation && !isDonorEligible) {
+    dateInput.min = nextEligibleDate;
+    dateInput.value = '';
+    dateInput.title = 'You can only book donation appointments from ' + new Date(nextEligibleDate).toDateString();
+  } else {
+    dateInput.min = today;
+    dateInput.title = '';
+  }
+}
+
+function toggleApptType() {
+  const isReq = document.querySelector('[name=type][value=request]').checked;
+  document.getElementById('unitsField').style.display = isReq ? 'block' : 'none';
+  document.getElementById('bloodTypeField').style.display = isReq ? 'block' : 'none';
+  updateDateMin();
+}
+updateDateMin();
+document.querySelectorAll('[name=type]').forEach(r => r.addEventListener('change', toggleApptType));
+
+document.getElementById('apptForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/appointments/book', {method:'POST', body: new URLSearchParams(fd)});
+  const d = await r.json();
+  if(d.success){ showToast(d.message,'success'); closeModal('apptModal'); e.target.reset(); setTimeout(()=>location.reload(),1500); }
+  else showToast(d.message,'error');
+});
+
+document.getElementById('requestForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/blood-request', {method:'POST', body: new URLSearchParams(fd)});
+  const d = await r.json();
+  if(d.success){ showToast(d.message,'success'); closeModal('requestModal'); e.target.reset(); setTimeout(()=>location.reload(),1500); }
+  else showToast(d.message,'error');
+});
+
+async function runMatch() {
+  const bt = document.getElementById('matchBloodType').value;
+  if(!bt){ showToast('Please select a blood type','warning'); return; }
+  const fac = document.getElementById('matchFacility').value;
+  document.getElementById('matchResults').innerHTML = '<div style="text-align:center;padding:20px"><i class="fas fa-spinner fa-spin" style="font-size:24px;color:var(--red)"></i><div style="margin-top:8px;font-size:13px;color:var(--mu)">Searching for compatible donors...</div></div>';
+  const r = await fetch('/match/donors', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({blood_type:bt, facility_id:fac||null})});
+  const d = await r.json();
+  if(!d.donors.length){
+    document.getElementById('matchResults').innerHTML = '<div class="es"><i class="fas fa-user-slash"></i><p>No eligible donors found for this blood type at this time.</p></div>';
+    return;
+  }
+  let html = `<div style="margin-bottom:12px;font-size:13px;color:var(--mu)"><strong style="color:var(--t)">${d.donors.length}</strong> compatible donor(s) found for <strong style="color:var(--red)">${bt}</strong></div>`;
+  html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+  d.donors.forEach(don => {
+    const scoreClass = don.match_score >= 70 ? 'high' : don.match_score >= 40 ? 'mid' : 'low';
+    html += `<div style="display:flex;align-items:center;gap:14px;background:var(--bg);border-radius:10px;padding:14px">
+      <div class="match-score ${scoreClass}">${don.match_score}%</div>
+      <div class="user-avatar" style="width:38px;height:38px;font-size:13px">${don.name.split(' ').map(n=>n[0]).join('')}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${don.name}</div>
+        <div style="font-size:12px;color:var(--mu)">${don.county} · Last donated: ${don.last_donation}</div>
+      </div>
+      <span class="blood-badge" style="width:28px;height:28px;font-size:10px">${don.blood_type}</span>
+      <a href="tel:${don.phone}" class="btn btn-green btn-sm"><i class="fas fa-phone"></i> ${don.phone}</a>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('matchResults').innerHTML = html;
+}
+</script>
+{% endblock %}

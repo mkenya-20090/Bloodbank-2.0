@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}Profile — HemoLink{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="ph">
+  <div>
+    <h1 class="ph-tt">My Profile</h1>
+    <p class="ph-sub">View and manage your account information</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('editMo')">
+    <i class="fas fa-pen"></i> Edit Info
+  </button>
+</div>
+
+<div class="g2" style="gap:16px">
+
+  <!-- Identity -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--b)">
+      <div style="width:50px;height:50px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;flex-shrink:0;font-family:'Inter',sans-serif">
+        {{ current_user.first_name[0] }}{{ current_user.last_name[0] }}
+      </div>
+      <div>
+        <div style="font-size:16px;font-weight:500">{{ current_user.first_name }} {{ current_user.last_name }}</div>
+        <div style="font-size:12px;color:var(--mu);font-family:'Inter',sans-serif;margin-top:1px">{{ current_user.email }}</div>
+        <div style="margin-top:5px">
+          <span class="bg {% if current_user.role=='admin' %}bg-b{% elif current_user.role=='donor' %}bg-r{% else %}bg-g{% endif %}">
+            {{ current_user.role|title }}
+          </span>
+          {% if current_user.blood_type %}
+          <span class="bb" style="margin-left:5px">{{ current_user.blood_type }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      {% for label, val in [
+        ('National ID', current_user.national_id or '—'),
+        ('Date of Birth', current_user.date_of_birth.strftime('%d %b %Y') if current_user.date_of_birth else '—'),
+        ('Gender', current_user.gender|title if current_user.gender else '—'),
+        ('Weight', (current_user.weight_kg|string + ' kg') if current_user.weight_kg else '—'),
+        ('County', current_user.county or '—'),
+        ('Phone', current_user.phone or '—'),
+        ('Facility', current_user.facility.name if current_user.facility else '—'),
+        ('Member Since', current_user.created_at.strftime('%d %b %Y')),
+      ] %}
+      <div>
+        <div style="font-size:10.5px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;font-family:'Inter',sans-serif;margin-bottom:2px">{{ label }}</div>
+        <div style="font-size:13px;font-weight:500;font-family:'Inter',sans-serif">{{ val }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Donation Status / Account Info -->
+  <div style="display:flex;flex-direction:column;gap:14px">
+    {% if current_user.role == 'donor' %}
+    {% set days = (today - current_user.last_donation_date).days if current_user.last_donation_date else 999 %}
+    <div class="card">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:12px">Donation Status</div>
+      {% if days >= 90 %}
+      <div style="padding:10px 13px;border-radius:6px;background:rgba(0,107,63,.08);border:1px solid rgba(0,107,63,.2);color:#16a34a;font-weight:500;font-size:13px;font-family:'Inter',sans-serif;margin-bottom:12px">
+        <i class="fas fa-check-circle"></i> Eligible to donate
+      </div>
+      {% else %}
+      <div style="padding:10px 13px;border-radius:6px;background:rgba(192,16,42,.07);border:1px solid rgba(192,16,42,.18);color:var(--red);font-weight:500;font-size:13px;font-family:'Inter',sans-serif;margin-bottom:12px">
+        <i class="fas fa-clock"></i> Next eligible in {{ 90 - days }} days
+      </div>
+      {% endif %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:10.5px;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:2px">Last Donation</div>
+          <div style="font-size:13px;font-weight:500;font-family:'Inter',sans-serif">{{ current_user.last_donation_date.strftime('%d %b %Y') if current_user.last_donation_date else 'Never' }}</div>
+        </div>
+        <div>
+          <div style="font-size:10.5px;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:2px">Total Donations</div>
+          <div style="font-size:22px;font-weight:500;color:var(--red);line-height:1">{{ current_user.donations|length }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:12px">Emergency Contact</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:10.5px;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:2px">Name</div>
+          <div style="font-size:13px;font-weight:500;font-family:'Inter',sans-serif">{{ current_user.emergency_contact_name or '—' }}</div>
+        </div>
+        <div>
+          <div style="font-size:10.5px;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:2px">Phone</div>
+          <div style="font-size:13px;font-weight:500;font-family:'Inter',sans-serif">{{ current_user.emergency_contact_phone or '—' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:10px">Account Status</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="bg {% if current_user.is_approved %}bg-g{% else %}bg-a{% endif %}">
+          <i class="fas fa-{% if current_user.is_approved %}check{% else %}clock{% endif %}"></i>
+          {{ 'Approved' if current_user.is_approved else 'Pending Approval' }}
+        </span>
+        <span class="bg {% if current_user.is_active %}bg-g{% else %}bg-r{% endif %}">
+          {{ 'Active' if current_user.is_active else 'Suspended' }}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Medical History -->
+<div class="card" style="margin-top:14px">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:14px">Medical History</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+    {% for label, val in [
+      ('HIV', current_user.hiv_status == 'positive'),
+      ('Hepatitis B', current_user.hepatitis_b),
+      ('Hepatitis C', current_user.hepatitis_c),
+      ('Malaria', current_user.malaria_history),
+      ('Recent Surgery', current_user.recent_surgery),
+      ('Recent Tattoo', current_user.recent_tattoo),
+    ] %}
+    <div style="background:var(--bg);border:1px solid var(--b);border-radius:6px;padding:10px 12px">
+      <div style="font-size:10.5px;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:4px">{{ label }}</div>
+      <div style="font-size:13px;font-weight:600;color:{% if val %}var(--red){% else %}#16a34a{% endif %};font-family:'Inter',sans-serif">{{ 'Positive' if val else 'Negative' }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+    {% if current_user.chronic_disease_details %}
+    <div><span style="color:var(--mu);font-size:11.5px;font-family:'Inter',sans-serif">Chronic conditions:</span> {{ current_user.chronic_disease_details }}</div>
+    {% endif %}
+    {% if current_user.medication_details %}
+    <div><span style="color:var(--mu);font-size:11.5px;font-family:'Inter',sans-serif">Medications:</span> {{ current_user.medication_details }}</div>
+    {% endif %}
+    {% if current_user.allergies %}
+    <div><span style="color:var(--mu);font-size:11.5px;font-family:'Inter',sans-serif">Allergies:</span> {{ current_user.allergies }}</div>
+    {% endif %}
+    {% if not current_user.chronic_disease_details and not current_user.medication_details and not current_user.allergies %}
+    <div style="color:var(--mu);font-size:13px;font-family:'Inter',sans-serif">No additional conditions noted.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editMo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Contact Information</div>
+      <button class="modal-close" onclick="closeModal('editMo')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="editForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input type="tel" class="form-control" name="phone" value="{{ current_user.phone or '' }}" placeholder="+254 7XX XXX XXX">
+          </div>
+          <div class="form-group">
+            <label class="form-label">County</label>
+            <input type="text" class="form-control" name="county" value="{{ current_user.county or '' }}" placeholder="e.g. Nairobi">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Emergency Contact Name</label>
+            <input type="text" class="form-control" name="emergency_contact_name" value="{{ current_user.emergency_contact_name or '' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emergency Contact Phone</label>
+            <input type="tel" class="form-control" name="emergency_contact_phone" value="{{ current_user.emergency_contact_phone or '' }}">
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editMo')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProfile()"><i class="fas fa-check"></i> Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function saveProfile() {
+  const fd = new FormData(document.getElementById('editForm'));
+  const r = await fetch('/profile', {method:'POST', body: fd});
+  const d = await r.json();
+  if (d.success) { showToast(d.message, 'success'); closeModal('editMo'); setTimeout(()=>location.reload(), 1000); }
+  else showToast(d.message || 'Error saving', 'error');
+}
+</script>
+{% endblock %}

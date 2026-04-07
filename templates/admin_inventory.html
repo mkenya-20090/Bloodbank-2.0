@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Blood Inventory{% endblock %}
+{% block page_title %}Blood Inventory{% endblock %}
+{% block content %}
+{% if alerts %}
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+{% for a in alerts %}
+<div class="alert {% if a.level=='critical' %}alert-danger{% else %}alert-warning{% endif %}" style="margin:0;flex:1;min-width:200px">
+  <i class="fas fa-exclamation-triangle"></i>
+  <span>{% if a.level=='critical' %}<strong>CRITICAL:</strong> {{ a.blood_type }} has only {{ a.units }} unit(s) remaining!
+  {% elif a.level=='expiring' %}<strong>EXPIRING:</strong> {{ a.blood_type }} expires in {{ a.days }} days
+  {% else %}<strong>LOW:</strong> {{ a.blood_type }} — {{ a.units }} unit(s) left{% endif %}</span>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:20px">
+  <button class="btn btn-primary" onclick="openModal('updateModal')"><i class="fas fa-plus"></i> Update Stock</button>
+  <button class="btn btn-secondary" onclick="openModal('dispenseModal')"><i class="fas fa-minus-circle"></i> Dispense Blood</button>
+</div>
+
+<!-- INVENTORY CARDS -->
+<div class="inv-grid mb-3" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+{% for inv in inventory %}
+<div class="inv-card {% if inv.units_available < 5 %}critical{% elif inv.units_available < 10 %}low{% endif %}" style="cursor:pointer" onclick="openEditModal({{ inv.id }}, '{{ inv.blood_type }}', {{ inv.units_available }}, '{{ inv.expiry_date }}')">
+  <div class="bt-big">{{ inv.blood_type }}</div>
+  <div class="units">{{ inv.units_available }}</div>
+  <div class="units-label">units available</div>
+  {% if inv.expiry_date %}
+  <div style="font-size:10px;color:var(--mu);margin-top:6px">Exp: {{ inv.expiry_date.strftime('%d %b %Y') }}</div>
+  {% endif %}
+  {% if inv.units_available < 5 %}
+  <div style="font-size:10px;color:#dc2626;margin-top:4px;font-weight:700"><i class="fas fa-exclamation-circle"></i> CRITICAL</div>
+  {% elif inv.units_available < 10 %}
+  <div style="font-size:10px;color:#d97706;margin-top:4px;font-weight:700"><i class="fas fa-exclamation"></i> LOW</div>
+  {% else %}
+  <div style="font-size:10px;color:#16a34a;margin-top:4px;font-weight:700"><i class="fas fa-check"></i> GOOD</div>
+  {% endif %}
+</div>
+{% endfor %}
+</div>
+
+<!-- DETAILED TABLE -->
+<div class="card">
+  <div class="card-hd">
+    <div class="card-tt">Inventory Details</div>
+    <div style="font-size:12px;color:var(--mu)">Last updated: {{ inventory[0].last_updated.strftime('%d %b %Y %H:%M') if inventory else '—' }}</div>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Blood Type</th><th>Units Available</th><th>Reserved</th><th>Net Available</th><th>Expiry Date</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for inv in inventory %}
+      <tr>
+        <td><span class="blood-badge">{{ inv.blood_type }}</span></td>
+        <td style="font-size:18px;font-weight:800">{{ inv.units_available }}</td>
+        <td>{{ inv.units_reserved }}</td>
+        <td style="font-weight:700;color:{% if inv.units_net < 5 %}#dc2626{% elif inv.units_net < 10 %}#d97706{% else %}#16a34a{% endif %}">{{ inv.units_net }}</td>
+        <td style="font-size:13px">
+          {% if inv.expiry_date %}
+          {% set days_left = (inv.expiry_date - today).days %}
+          <span style="color:{% if days_left <= 7 %}#dc2626{% elif days_left <= 14 %}#d97706{% else %}#16a34a{% endif %}">
+            {{ inv.expiry_date.strftime('%d %b %Y') }}
+            {% if days_left <= 7 %}<span style="font-size:10px;font-weight:600"> ({{ days_left }}d)</span>{% endif %}
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="badge {% if inv.units_available < 5 %}badge-danger{% elif inv.units_available < 10 %}badge-gold{% else %}badge-green{% endif %}">
+            {% if inv.units_available < 5 %}Critical{% elif inv.units_available < 10 %}Low{% else %}Good{% endif %}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="openEditModal({{ inv.id }},'{{ inv.blood_type }}',{{ inv.units_available }},'{{ inv.expiry_date or '' }}')">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PREDICTION BOX -->
+<div class="card mt-3">
+  <div class="card-hd">
+    <div class="card-tt"><i class="fas fa-brain" style="color:var(--red);margin-right:8px"></i>AI Stock Predictions</div>
+  </div>
+  <div class="grid-3" style="gap:12px">
+    <div style="background:var(--bg);border-radius:10px;padding:16px;border-left:3px solid var(--red)">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--mu);font-weight:600;margin-bottom:8px">Most Needed</div>
+      <div style="font-size:20px;font-weight:800;color:var(--red)">O+</div>
+      <div style="font-size:12px;color:var(--mu);margin-top:4px">Universal donor — always high demand</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:16px;border-left:3px solid #d97706">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--mu);font-weight:600;margin-bottom:8px">Restock Alert</div>
+      <div style="font-size:20px;font-weight:800;color:#d97706">
+        {% for a in alerts[:1] %}{{ a.blood_type }}{% else %}None{% endfor %}
+      </div>
+      <div style="font-size:12px;color:var(--mu);margin-top:4px">{{ alerts|length }} blood type(s) need restocking</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:16px;border-left:3px solid #16a34a">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--mu);font-weight:600;margin-bottom:8px">Next Campaign</div>
+      <div style="font-size:20px;font-weight:800;color:#16a34a">Recommend</div>
+      <div style="font-size:12px;color:var(--mu);margin-top:4px">Schedule donation drive within 14 days</div>
+    </div>
+  </div>
+</div>
+
+<!-- UPDATE STOCK MODAL -->
+<div class="modal-overlay" id="updateModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-plus" style="color:var(--green);margin-right:8px"></i>Update Blood Stock</div>
+      <button class="modal-close" onclick="closeModal('updateModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="updateForm">
+    <div class="modal-body">
+      <input type="hidden" name="inv_id" id="editInvId">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Blood Type</label>
+          <select name="blood_type" id="editBT" class="form-select" required>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Units Available</label>
+          <input type="number" name="units_available" id="editUnits" class="form-control" min="0" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date</label>
+        <input type="date" name="expiry_date" id="editExpiry" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('updateModal')">Cancel</button>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+<!-- DISPENSE MODAL -->
+<div class="modal-overlay" id="dispenseModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-minus-circle" style="color:var(--red);margin-right:8px"></i>Dispense Blood Units</div>
+      <button class="modal-close" onclick="closeModal('dispenseModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="dispenseForm">
+    <div class="modal-body">
+      <div class="alert-warning alert mb-2"><i class="fas fa-exclamation-triangle"></i><span>This will permanently reduce inventory. Ensure recipient details are documented.</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Blood Type</label>
+          <select name="blood_type" class="form-select" required>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Units to Dispense</label>
+          <input type="number" name="units" class="form-control" min="1" value="1" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Recipient / Purpose</label>
+        <input type="text" name="recipient_note" class="form-control" placeholder="e.g. Patient ID, Emergency surgery...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('dispenseModal')">Cancel</button>
+      <button type="submit" class="btn btn-danger"><i class="fas fa-minus-circle"></i> Dispense</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const today = new Date().toISOString().split('T')[0];
+function openEditModal(id, bt, units, expiry) {
+  document.getElementById('editInvId').value = id;
+  document.getElementById('editBT').value = bt;
+  document.getElementById('editUnits').value = units;
+  document.getElementById('editExpiry').value = expiry || '';
+  openModal('updateModal');
+}
+document.getElementById('updateForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/admin/inventory/update', {method:'POST', body: new URLSearchParams(fd)});
+  const d = await r.json();
+  if(d.success){ showToast(d.message,'success'); closeModal('updateModal'); setTimeout(()=>location.reload(),1000); }
+  else showToast(d.message,'error');
+});
+document.getElementById('dispenseForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if(!confirm('Confirm dispensing blood units? This cannot be undone.')) return;
+  const fd = new FormData(e.target);
+  const r = await fetch('/admin/inventory/dispense', {method:'POST', body: new URLSearchParams(fd)});
+  const d = await r.json();
+  if(d.success){ showToast(d.message,'success'); closeModal('dispenseModal'); setTimeout(()=>location.reload(),1000); }
+  else showToast(d.message,'error');
+});
+</script>
+{% endblock %}

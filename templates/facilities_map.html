@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% block title %}Facilities Map — HemoLink{% endblock %}
+{% block page_title %}Facilities Map{% endblock %}
+
+{% block content %}
+<div class="ph">
+  <div>
+    <h1 class="ph-tt">Facilities Map</h1>
+    <p class="ph-sub">Live blood availability across all HemoLink Kenya facilities</p>
+  </div>
+  <div class="legend-container">
+    <span class="legend-item">
+      <span class="legend-dot legend-dot-red"></span> Your facility
+    </span>
+    <span class="legend-item">
+      <span class="legend-dot legend-dot-green"></span> Other facilities
+    </span>
+    {% if current_user.role == 'admin' %}
+    <button class="btn btn-primary btn-sm add-btn" onclick="openModal('addFacilityMo')">
+      <i class="fas fa-plus"></i> Add Facility
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="containers">
+  <!-- Facility list -->
+  <div class="facility-list" id="facilityList"></div>
+
+  <!-- Map container -->
+  <div class="map-container">
+    <div id="map" class="map-wrapper"></div>
+    <div id="mapLoader" class="map-loader">
+      <div class="loader-content">
+        <div class="loader-spinner"></div>
+        <p class="loader-text">Loading map…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if current_user.role == 'admin' %}
+<!-- Add Facility Modal -->
+<div class="modal-overlay" id="addFacilityMo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add New Facility</div>
+      <button class="modal-close" onclick="closeModal('addFacilityMo')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="addFacMsg" class="modal-msg" style="display:none"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Facility Name <span class="required">*</span></label>
+          <input type="text" id="fac_name" class="form-control" placeholder="e.g. Kisumu General Hospital">
+        </div>
+        <div class="form-group">
+          <label class="form-label">County <span class="required">*</span></label>
+          <input type="text" id="fac_county" class="form-control" placeholder="e.g. Kisumu">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Address</label>
+        <input type="text" id="fac_address" class="form-control" placeholder="e.g. Jomo Kenyatta Ave, Kisumu">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="text" id="fac_phone" class="form-control" placeholder="e.g. 057-2020000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" id="fac_email" class="form-control" placeholder="facility@health.go.ke">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Latitude <span class="lat-label">(for map pin)</span></label>
+          <input type="number" id="fac_lat" class="form-control" placeholder="e.g. -0.0917" step="0.0001">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Longitude</label>
+          <input type="number" id="fac_lng" class="form-control" placeholder="e.g. 34.7679" step="0.0001">
+        </div>
+      </div>
+      <div class="info-box">
+        <i class="fas fa-info-circle info-icon"></i>
+        Find latitude/longitude by right-clicking any location on Google Maps and selecting "What's here?"
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addFacilityMo')">Cancel</button>
+      <button class="btn btn-primary" id="addFacBtn" onclick="submitFacility()"><i class="fas fa-plus"></i> Add Facility</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+.ph{padding:20px;border-bottom:1px solid var(--b)}
+.ph-tt{font-size:28px;font-weight:600;color:var(--fg);font-family:'Inter',sans-serif;margin:0}
+.ph-sub{font-size:13px;color:var(--mu);margin:6px 0 0 0;font-family:'Inter',sans-serif}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mu);font-family:'Inter',sans-serif}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.legend-dot-red{background:var(--red)}
+.legend-dot-green{background:#006B3F}
+.legend-container{display:flex;gap:8px;align-items:center}
+.add-btn{margin-left:8px}
+.containers{display:grid;grid-template-columns:300px 1fr;gap:12px;height:calc(100vh - 210px);min-height:500px}
+.facility-list{overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.map-container{border-radius:7px;overflow:hidden;border:1px solid var(--b);position:relative}
+.map-wrapper{width:100%;height:100%}
+.map-loader{position:absolute;inset:0;background:var(--sur);display:flex;align-items:center;justify-content:center;z-index:1000}
+.loader-content{text-align:center;font-family:'Inter',sans-serif}
+.loader-spinner{width:32px;height:32px;border:3px solid var(--b);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+.loader-text{color:var(--mu);font-size:12px}
+.fc{background:var(--sur);border:1px solid var(--b);border-radius:6px;padding:11px 13px;cursor:pointer}
+.fc:hover,.fc.active{border-color:var(--red)}
+.fc.own{border-left:3px solid var(--red)}
+.fc-name{font-weight:500;font-size:13px;margin-bottom:2px}
+.fc-meta{font-size:11px;color:var(--mu);font-family:'Inter',sans-serif;margin-bottom:7px}
+.bp{display:flex;flex-wrap:wrap;gap:3px}
+.bpl{font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px;font-family:'Inter',sans-serif}
+.bpl-ok{background:rgba(0,107,63,.08);color:#006B3F;border:1px solid rgba(0,107,63,.2)}
+.bpl-lo{background:rgba(217,119,6,.09);color:#a07000;border:1px solid rgba(217,119,6,.2)}
+.bpl-cr{background:rgba(192,16,42,.08);color:var(--red);border:1px solid rgba(192,16,42,.2)}
+.bpl-empty{color:var(--mu);font-size:10px;font-family:Inter,sans-serif}
+.lp-hd{padding:10px 12px;font-weight:600;font-size:13px;font-family:'Inter',sans-serif}
+.lp-hd-own{background:#C8102E;color:#fff}
+.lp-hd-other{background:#1a1a1a;color:#fff}
+.lp-body{padding:10px 12px;font-family:'Inter',sans-serif;font-size:12px;background:#fff}
+.lp-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f0f0f0}
+.lp-row:last-child{border:none}
+.lp-lbl{color:#888}.lp-val{font-weight:500;color:#111}
+.lp-blood-units{color:#C8102E;font-size:15px}
+.lp-grid-label{font-size:10px;color:#888;margin-top:7px;margin-bottom:3px;font-family:Inter,sans-serif}
+.lp-bg{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:8px}
+.lp-bt{text-align:center;padding:3px 2px;border-radius:3px;font-size:10px;font-weight:600}
+.leaflet-popup-content-wrapper{border-radius:7px;padding:0;overflow:hidden;border:none}
+.leaflet-popup-content{margin:0;width:250px!important}
+.leaflet-popup-tip-container{display:none}
+.modal-msg{padding:9px 11px;border-radius:5px;font-size:12.5px;margin-bottom:12px;font-family:'Inter',sans-serif}
+.modal-msg-success{background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);color:#16a34a}
+.modal-msg-error{background:rgba(192,16,42,.08);border:1px solid rgba(192,16,42,.2);color:var(--red)}
+.info-box{background:var(--bg);border-radius:5px;padding:10px 12px;border:1px solid var(--b);font-size:12px;color:var(--mu);font-family:'Inter',sans-serif}
+.info-icon{color:var(--red);margin-right:5px}
+.required{color:var(--red)}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<script>
+const FACS = {{ facilities|tojson|safe }} || [];
+const IS_ADMIN = {{ 'true' if current_user.role == 'admin' else 'false' | lower }};
+const isDark = document.documentElement.className === 'dark';
+
+// Build facility cards
+const list = document.getElementById('facilityList');
+FACS.forEach(f => {
+  const card = document.createElement('div');
+  card.className = 'fc' + (f.is_own ? ' own' : '');
+  card.id = 'fc-' + f.id;
+  const pills = Object.entries(f.blood_summary).map(([bt, u]) => {
+    const cls = u >= 10 ? 'bpl-ok' : u >= 5 ? 'bpl-lo' : 'bpl-cr';
+    return `<span class="bpl ${cls}">${bt}:${u}</span>`;
+  }).join('');
+  card.innerHTML = `
+    <div class="fc-name">${f.is_own ? '★ ' : ''}${f.name}</div>
+    <div class="fc-meta">📍 ${f.county} · 🩸 ${f.total_units} units · 👤 ${f.donor_count} donors</div>
+    <div class="bp">${pills || '<span class="bpl-empty">No inventory</span>'}</div>`;
+  card.addEventListener('click', () => flyTo(f.id));
+  list.appendChild(card);
+});
+
+// Map
+const map = L.map('map', {zoomControl: true}).setView([-0.5, 37.5], 6);
+const tiles = isDark
+  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+  : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+L.tileLayer(tiles, {attribution: '© OpenStreetMap · © CARTO', maxZoom: 18}).addTo(map);
+map.whenReady(() => { document.getElementById('mapLoader').style.display = 'none'; });
+
+function mkIcon(color, sz) {
+  sz = sz || 34;
+  return L.divIcon({
+    className: '',
+    html: `<svg width="${sz}" height="${sz+8}" viewBox="0 0 34 42"><path d="M17 2C10.3 2 5 7.3 5 14c0 9.5 12 26 12 26S29 23.5 29 14C29 7.3 23.7 2 17 2z" fill="${color}" opacity=".9"/><circle cx="17" cy="14" r="5.5" fill="white"/></svg>`,
+    iconSize: [sz, sz+8], iconAnchor: [sz/2, sz+8], popupAnchor: [0, -(sz+6)]
+  });
+}
+const ownIcon = mkIcon('#C8102E', 38);
+const othIcon = mkIcon('#006B3F', 32);
+const markers = {};
+
+FACS.forEach(f => {
+  if (!f.lat || !f.lng) return;
+  const bg = isDark ? '#1e1e1e' : '#fff';
+  const txt = isDark ? '#e8e8e8' : '#111';
+  const sep = isDark ? '#2a2a2a' : '#f0f0f0';
+  const grid = Object.entries(f.blood_summary).map(([bt, u]) => {
+    const bc = u >= 10 ? '#e6f4ee' : u >= 5 ? '#fff8e1' : '#ffeaea';
+    const fc = u >= 10 ? '#006B3F' : u >= 5 ? '#a07000' : '#C8102E';
+    return `<div class="lp-bt" style="background:${bc};color:${fc}">${bt}<br>${u}</div>`;
+  }).join('');
+  const popup = `
+    <div class="lp-hd ${f.is_own?'lp-hd-own':'lp-hd-other'}">${f.name}</div>
+    <div class="lp-body" style="background:${bg};color:${txt}">
+      <div class="lp-row" style="border-color:${sep}"><span class="lp-lbl">County</span><span class="lp-val" style="color:${txt}">${f.county}</span></div>
+      <div class="lp-row" style="border-color:${sep}"><span class="lp-lbl">Address</span><span class="lp-val" style="color:${txt}">${f.address||'—'}</span></div>
+      <div class="lp-row" style="border-color:${sep}"><span class="lp-lbl">Phone</span><span class="lp-val" style="color:${txt}">${f.phone||'—'}</span></div>
+      <div class="lp-row" style="border-color:${sep}"><span class="lp-lbl">Blood Units</span><span class="lp-val lp-blood-units">${f.total_units}</span></div>
+      <div class="lp-row" style="border-color:${sep}"><span class="lp-lbl">Donors</span><span class="lp-val" style="color:${txt}">${f.donor_count}</span></div>
+      ${grid ? `<div class="lp-grid-label">Blood Availability</div><div class="lp-bg">${grid}</div>` : ''}
+    </div>`;
+  const m = L.marker([f.lat, f.lng], {icon: f.is_own ? ownIcon : othIcon})
+    .addTo(map).bindPopup(popup, {maxWidth: 260});
+  m.on('click', () => {
+    document.querySelectorAll('.fc').forEach(c => c.classList.remove('active'));
+    const card = document.getElementById('fc-' + f.id);
+    if (card) { card.classList.add('active'); card.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+  });
+  markers[f.id] = m;
+});
+
+function flyTo(id) {
+  document.querySelectorAll('.fc').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById('fc-' + id);
+  if (card) card.classList.add('active');
+  const m = markers[id];
+  if (m) { map.flyTo(m.getLatLng(), 13, {duration:1.1}); setTimeout(() => m.openPopup(), 1200); }
+}
+
+window.addEventListener('load', () => {
+  const own = FACS.find(f => f.is_own);
+  if (own && markers[own.id]) setTimeout(() => flyTo(own.id), 500);
+});
+
+// Add facility
+async function submitFacility() {
+  const name = document.getElementById('fac_name').value.trim();
+  const county = document.getElementById('fac_county').value.trim();
+  const msg = document.getElementById('addFacMsg');
+  const btn = document.getElementById('addFacBtn');
+  if (!name || !county) { showMsg('Facility name and county are required.', 'error'); return; }
+  btn.textContent = 'Adding…'; btn.disabled = true;
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('county', county);
+  fd.append('address', document.getElementById('fac_address').value.trim());
+  fd.append('phone', document.getElementById('fac_phone').value.trim());
+  fd.append('email', document.getElementById('fac_email').value.trim());
+  fd.append('latitude', document.getElementById('fac_lat').value);
+  fd.append('longitude', document.getElementById('fac_lng').value);
+  const r = await fetch('/admin/facilities/add', {method:'POST', body: fd});
+  const d = await r.json();
+  if (d.success) {
+    showMsg(d.message, 'success');
+    showToast(d.message, 'success');
+    btn.textContent = '✓ Added!';
+    setTimeout(() => { closeModal('addFacilityMo'); location.reload(); }, 1500);
+  } else {
+    showMsg(d.message, 'error');
+    btn.textContent = 'Add Facility'; btn.disabled = false;
+  }
+}
+function showMsg(text, type) {
+  const el = document.getElementById('addFacMsg');
+  el.style.display = 'block';
+  el.classList.remove('modal-msg-success', 'modal-msg-error');
+  el.classList.add(type === 'success' ? 'modal-msg-success' : 'modal-msg-error');
+  el.textContent = text;
+}
+</script>
+{% endblock %}
